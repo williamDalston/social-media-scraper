@@ -3,9 +3,9 @@ from sqlalchemy.orm import sessionmaker
 from scraper.schema import init_db
 from models.user import User, UserRole
 from .jwt_utils import generate_token, verify_token, get_current_user, get_db_session
-from .decorators import require_auth
+from .decorators import require_auth, require_any_role
 from .validators import validate_email, validate_password, validate_username
-from .password_reset import create_password_reset_token, reset_password
+from .password_reset import request_password_reset, reset_password
 from .audit import log_security_event, AuditEventType
 from datetime import datetime
 import os
@@ -314,16 +314,10 @@ def request_password_reset():
     if not email_valid:
         return jsonify({'error': email_error}), 400
     
-    # Create reset token
-    token, expires_at = create_password_reset_token(email)
-    
-    # Always return success message (don't reveal if user exists)
-    # In production, send email with token
-    return jsonify({
-        'message': 'If an account with that email exists, a password reset link has been sent.',
-        'token': token,  # In production, remove this and send via email
-        'expires_at': expires_at.isoformat() if expires_at else None
-    }), 200
+    # Request password reset (uses the password_reset blueprint endpoint)
+    # This will handle token creation and return appropriate response
+    from .password_reset import request_password_reset
+    return request_password_reset()
 
 @auth_bp.route('/password-reset/confirm', methods=['POST'])
 def confirm_password_reset():
@@ -471,12 +465,12 @@ def get_audit_logs_endpoint():
         offset=offset
     )
     
-        return jsonify({
-            'logs': logs,
-            'count': len(logs),
-            'limit': limit,
-            'offset': offset
-        }), 200
+    return jsonify({
+        'logs': logs,
+        'count': len(logs),
+        'limit': limit,
+        'offset': offset
+    }), 200
 
 @auth_bp.route('/gdpr/export', methods=['GET'])
 @require_auth
