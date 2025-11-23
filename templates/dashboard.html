@@ -9,6 +9,7 @@
     <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <link rel="stylesheet" href="/static/css/dashboard-enhancements.css">
+    <link rel="stylesheet" href="/static/css/dashboard-ui-enhancements.css">
     <style>
         :root {
             --bg-color: #0f172a;
@@ -20,11 +21,13 @@
         }
 
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-color);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background-attachment: fixed;
             color: var(--text-primary);
             margin: 0;
             padding: 20px;
+            min-height: 100vh;
         }
 
         .header {
@@ -32,6 +35,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
+            position: relative;
         }
 
         h1 {
@@ -294,6 +298,12 @@
         #progressBarContainer:hover #progressBarFill {
             box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
         }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
 
@@ -320,23 +330,23 @@
             <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect metrics" data-tooltip="Run the scraper to collect metrics from all tracked accounts. This may take a few minutes.">Run Scraper (Sim)</button>
             
             <!-- Progress Bar Container -->
-            <div id="progressBarContainer" style="display: none; flex: 1; max-width: 400px; margin-left: 10px;">
-                <div style="display: flex; align-items: center; gap: 10px; background-color: var(--card-bg); padding: 8px 12px; border-radius: 6px;">
+            <div id="progressBarContainer" style="display: none; flex: 1; max-width: 450px; margin-left: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 0;">
                     <div style="flex: 1;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px;">
-                            <span id="progressText">0%</span>
-                            <span id="progressSpeed">0 accounts/sec</span>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span id="progressText" style="font-size: 14px; font-weight: 700; color: var(--text-primary);">0%</span>
+                            <span id="progressSpeed" style="font-size: 12px; font-weight: 600; color: var(--success); background: rgba(16, 185, 129, 0.1); padding: 4px 8px; border-radius: 6px;">0 accounts/sec</span>
                         </div>
-                        <div style="background-color: #334155; border-radius: 4px; height: 8px; overflow: hidden; position: relative;">
-                            <div id="progressBarFill" style="background: linear-gradient(90deg, var(--accent), #10b981); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div>
+                        <div style="background-color: rgba(51, 65, 85, 0.5); border-radius: 8px; height: 10px; overflow: hidden; position: relative; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);">
+                            <div id="progressBarFill" style="background: linear-gradient(90deg, #3b82f6, #10b981, #3b82f6); background-size: 200% 100%; height: 100%; width: 0%; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); border-radius: 8px; animation: gradientShift 3s ease infinite;"></div>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
-                            <span id="progressTime">Elapsed: 0s</span>
-                            <span id="progressETA">ETA: --</span>
+                        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--text-secondary);">
+                            <span id="progressTime" style="display: flex; align-items: center; gap: 4px;">⏱️ <span>Elapsed: 0s</span></span>
+                            <span id="progressETA" style="display: flex; align-items: center; gap: 4px;">⏳ <span>ETA: --</span></span>
                         </div>
-                        <div id="progressMessage" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Initializing...</div>
+                        <div id="progressMessage" style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-style: italic;">Initializing...</div>
                     </div>
-                    <button onclick="cancelScraper()" id="cancelScraperBtn" style="background: transparent; border: 1px solid #dc2626; color: #dc2626; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Cancel scraper">✕</button>
+                    <button onclick="cancelScraper()" id="cancelScraperBtn" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #dc2626; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; flex-shrink: 0;" title="Cancel scraper" onmouseover="this.style.background='rgba(220, 38, 38, 0.2)'; this.style.transform='scale(1.1)'" onmouseout="this.style.background='rgba(220, 38, 38, 0.1)'; this.style.transform='scale(1)'">✕</button>
                 </div>
             </div>
             <div class="export-menu">
