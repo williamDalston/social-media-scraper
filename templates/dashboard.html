@@ -270,6 +270,30 @@
             margin: 10px 0;
             text-align: center;
         }
+        
+        /* Progress Bar Styles */
+        #progressBarContainer {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        #progressBarFill {
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+        
+        #progressBarContainer:hover #progressBarFill {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+        }
     </style>
 </head>
 
@@ -294,6 +318,27 @@
             <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)" aria-label="CSV file input">
 
             <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect metrics" data-tooltip="Run the scraper to collect metrics from all tracked accounts. This may take a few minutes.">Run Scraper (Sim)</button>
+            
+            <!-- Progress Bar Container -->
+            <div id="progressBarContainer" style="display: none; flex: 1; max-width: 400px; margin-left: 10px;">
+                <div style="display: flex; align-items: center; gap: 10px; background-color: var(--card-bg); padding: 8px 12px; border-radius: 6px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px;">
+                            <span id="progressText">0%</span>
+                            <span id="progressSpeed">0 accounts/sec</span>
+                        </div>
+                        <div style="background-color: #334155; border-radius: 4px; height: 8px; overflow: hidden; position: relative;">
+                            <div id="progressBarFill" style="background: linear-gradient(90deg, var(--accent), #10b981); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 4px;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-secondary);">
+                            <span id="progressTime">Elapsed: 0s</span>
+                            <span id="progressETA">ETA: --</span>
+                        </div>
+                        <div id="progressMessage" style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">Initializing...</div>
+                    </div>
+                    <button onclick="cancelScraper()" id="cancelScraperBtn" style="background: transparent; border: 1px solid #dc2626; color: #dc2626; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;" title="Cancel scraper">✕</button>
+                </div>
+            </div>
             <div class="export-menu">
                 <button class="btn" onclick="showExportMenu()" aria-label="Export data" data-tooltip="Export data in various formats">Export Data ▼</button>
                 <div id="exportMenu" class="export-dropdown" style="display: none;">
@@ -454,6 +499,9 @@
     <!-- Modal System -->
     <script src="/static/js/modal.js"></script>
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    
+    <!-- Progress Bar Component -->
+    <script src="/static/js/progress-bar.js" defer></script>
     
     <!-- Dashboard JavaScript (code split and lazy loaded) -->
     <script src="/static/js/dashboard.js" defer></script>
@@ -634,22 +682,43 @@
             btn.innerText = 'Running...';
             btn.disabled = true;
             
-            const loadingToast = toast.info('Running scraper...', 0);
-            
             try {
-                const response = await fetch('/api/run-scraper', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mode: 'simulated' })
-                });
+                // Try to use the async v1 API endpoint first (better for progress tracking)
+                let response;
+                let useAsync = true;
+                
+                try {
+                    response = await fetch('/api/v1/jobs/run-scraper', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                        },
+                        body: JSON.stringify({ mode: 'simulated' })
+                    });
+                } catch (e) {
+                    // Fallback to sync endpoint
+                    useAsync = false;
+                    response = await fetch('/api/run-scraper', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mode: 'simulated' })
+                    });
+                }
+                
                 const result = await response.json();
                 
                 if (response.ok) {
-                    toast.remove(loadingToast);
-                    toast.success(result.message || 'Scraper completed successfully!');
-                    if (window.dashboard) window.dashboard.loadAccounts();
+                    if (useAsync && result.job_id && window.progressBar) {
+                        // Show progress bar for async jobs
+                        window.progressBar.show(result.job_id);
+                        toast.success('Scraper started! Progress will be shown below.');
+                    } else {
+                        // Sync endpoint - show completion message
+                        toast.success(result.message || 'Scraper completed successfully!');
+                        if (window.dashboard) window.dashboard.loadAccounts();
+                    }
                 } else {
-                    toast.remove(loadingToast);
                     if (window.errorHandler) {
                         errorHandler.handleError({ status: response.status, message: result.error || 'Scraper failed', response: { data: result } }, {
                             retryAction: () => runScraper()
@@ -659,7 +728,6 @@
                     }
                 }
             } catch (e) {
-                toast.remove(loadingToast);
                 if (window.errorHandler) {
                     errorHandler.handleError(e, {
                         retryAction: () => runScraper()
@@ -670,6 +738,12 @@
             }
             btn.innerText = originalText;
             btn.disabled = false;
+        }
+        
+        function cancelScraper() {
+            if (window.progressBar) {
+                window.progressBar.cancel();
+            }
         }
     </script>
 </body>

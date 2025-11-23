@@ -242,7 +242,28 @@ def scrape_all_accounts(self, mode='simulated', db_path=None):
         self.update_state(state='PROGRESS', meta={'progress': 20, 'message': 'Running scraper...'})
         update_job_progress(job_id, 20, 'running', {'message': 'Running scraper...'})
         
-        simulate_metrics(db_path=db_path, mode=mode)
+        # Progress callback to update job progress
+        def progress_callback(processed, total, current_account, speed, elapsed):
+            progress = 20 + int((processed / total) * 70)  # 20-90% range
+            eta_seconds = (total - processed) / speed if speed > 0 else 0
+            eta_str = f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s" if eta_seconds > 0 else "--"
+            
+            meta = {
+                'progress': progress,
+                'message': f'Scraping {current_account}... ({processed}/{total})',
+                'processed': processed,
+                'total': total,
+                'speed': round(speed, 2),
+                'elapsed': round(elapsed, 1),
+                'eta': eta_str
+            }
+            self.update_state(state='PROGRESS', meta=meta)
+            update_job_progress(job_id, progress, 'running', meta)
+        
+        # Optimize: Use more workers for better parallelization (up to 10)
+        import os
+        max_workers = min(10, int(os.getenv('SCRAPER_MAX_WORKERS', '8')))
+        simulate_metrics(db_path=db_path, mode=mode, parallel=True, max_workers=max_workers, progress_callback=progress_callback)
         
         # Update progress after completion
         self.update_state(state='PROGRESS', meta={'progress': 90, 'message': 'Finalizing...'})

@@ -36,7 +36,7 @@ except:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-def simulate_metrics(db_path='social_media.db', mode='simulated', parallel=True, max_workers=5):
+def simulate_metrics(db_path='social_media.db', mode='simulated', parallel=True, max_workers=5, progress_callback=None):
     """
     Collect metrics for all accounts.
     
@@ -45,6 +45,7 @@ def simulate_metrics(db_path='social_media.db', mode='simulated', parallel=True,
         mode: Scraper mode ('simulated' or 'real')
         parallel: If True, use parallel scraping (default: True)
         max_workers: Number of parallel workers (default: 5)
+        progress_callback: Optional callback function(processed, total, current_account, speed, elapsed)
     """
     import time
     start_time = time.time()
@@ -73,13 +74,18 @@ def simulate_metrics(db_path='social_media.db', mode='simulated', parallel=True,
         def session_factory():
             return Session()
         
+        # Optimize: Increase max_workers for better performance
+        # Use more workers if we have many accounts
+        optimal_workers = min(max_workers * 2 if len(accounts) > 20 else max_workers, 10)
+        
         metrics = scrape_accounts_parallel(
             accounts=accounts,
             scraper=scraper,
             session_factory=session_factory,
             today=today,
-            max_workers=max_workers,
-            prioritize_core=True
+            max_workers=optimal_workers,
+            prioritize_core=True,
+            progress_callback=progress_callback
         )
         
         summary = metrics.get_summary()

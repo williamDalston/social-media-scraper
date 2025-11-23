@@ -155,6 +155,8 @@ def scrape_account_parallel(
             )
             
             session.add(snapshot)
+            # Use batch commits for better performance (commit every 10 accounts or at end)
+            # For now, commit immediately but this could be optimized further
             session.commit()
             
             duration = time.time() - start_time
@@ -198,7 +200,8 @@ def scrape_accounts_parallel(
     session_factory,
     today,
     max_workers: int = 5,
-    prioritize_core: bool = True
+    prioritize_core: bool = True,
+    progress_callback: Optional[Callable] = None
 ) -> ScrapingMetrics:
     """
     Scrape multiple accounts in parallel.
@@ -210,12 +213,18 @@ def scrape_accounts_parallel(
         today: Date object for snapshot date
         max_workers: Maximum number of concurrent workers
         prioritize_core: If True, prioritize core accounts
+        progress_callback: Optional callback function(processed, total, current_account, speed)
         
     Returns:
         ScrapingMetrics instance with performance data
     """
     metrics = ScrapingMetrics()
     metrics.start()
+    
+    total_accounts = len(accounts)
+    processed_count = 0
+    last_progress_update = time.time()
+    progress_update_interval = 0.5  # Update progress every 0.5 seconds
     
     # Sort accounts: core accounts first, then by account_key
     if prioritize_core:
@@ -261,6 +270,25 @@ def scrape_accounts_parallel(
                     metrics.record_success(account.account_key, account.platform, duration)
                 else:
                     metrics.record_skipped(account.account_key, account.platform)
+                
+                processed_count += 1
+                
+                # Update progress callback if provided
+                if progress_callback:
+                    current_time = time.time()
+                    elapsed = current_time - metrics.start_time
+                    speed = processed_count / elapsed if elapsed > 0 else 0
+                    
+                    # Throttle progress updates
+                    if current_time - last_progress_update >= progress_update_interval:
+                        progress_callback(
+                            processed=processed_count,
+                            total=total_accounts,
+                            current_account=f"{account.platform}/{account.handle}",
+                            speed=speed,
+                            elapsed=elapsed
+                        )
+                        last_progress_update = current_time
                     
             except Exception as e:
                 logger.exception(
@@ -268,6 +296,7 @@ def scrape_accounts_parallel(
                     extra={'account_key': account.account_key, 'error': str(e)}
                 )
                 metrics.record_error(account.account_key, account.platform)
+                processed_count += 1
     
     metrics.finish()
     return metrics
