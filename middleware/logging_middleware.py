@@ -128,22 +128,57 @@ def setup_request_logging(app):
     
     @app.errorhandler(Exception)
     def log_exception(error):
-        """Log unhandled exceptions."""
+        """Log unhandled exceptions with enhanced error detection."""
         # Calculate duration if available
         duration_ms = 0
         if hasattr(g, 'start_time'):
             duration_ms = (time.time() - g.start_time) * 1000
         
+        # Enhanced error detection
+        error_context = None
+        fix_suggestion = None
+        try:
+            from config.error_detection import detect_error, get_fix_suggestion
+            
+            error_context = detect_error(error, context={
+                'request_id': getattr(g, 'request_id', None),
+                'user_id': getattr(g, 'user_id', None),
+                'path': request.path,
+                'method': request.method,
+                'duration_ms': round(duration_ms, 2),
+            })
+            
+            fix_suggestion = get_fix_suggestion(error_context)
+        except Exception as e:
+            # If error detection fails, log it but don't fail
+            logger.debug(f"Error detection failed: {e}")
+        
+        # Log with enhanced context
+        log_extra = {
+            'method': request.method,
+            'path': request.path,
+            'error_type': type(error).__name__,
+            'error_message': str(error),
+            'duration_ms': round(duration_ms, 2),
+            'user_id': getattr(g, 'user_id', None),
+        }
+        
+        if error_context:
+            log_extra.update({
+                'error_category': error_context.category.value,
+                'error_severity': error_context.severity.value,
+                'error_file': error_context.file_path,
+                'error_line': error_context.line_number,
+                'error_function': error_context.function_name,
+            })
+        
+        if fix_suggestion:
+            log_extra['fix_suggestion'] = fix_suggestion.description
+            log_extra['fix_steps'] = fix_suggestion.steps
+        
         logger.exception(
             "Unhandled exception",
-            extra={
-                'method': request.method,
-                'path': request.path,
-                'error_type': type(error).__name__,
-                'error_message': str(error),
-                'duration_ms': round(duration_ms, 2),
-                'user_id': getattr(g, 'user_id', None),
-            }
+            extra=log_extra
         )
         
         # Record error metrics
