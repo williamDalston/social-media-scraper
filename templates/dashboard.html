@@ -339,7 +339,7 @@
                 style="background-color: #475569;" aria-label="Upload CSV file" data-tooltip="Upload a CSV file with social media accounts to track">Upload CSV</button>
             <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)" aria-label="CSV file input">
 
-            <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect metrics" data-tooltip="Run the scraper to collect metrics from all tracked accounts. This may take a few minutes.">Run Scraper (Sim)</button>
+            <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect real metrics" data-tooltip="Run the scraper to collect real metrics from all tracked accounts. This may take a few minutes.">Run Scraper</button>
             
             <!-- Progress Bar Container -->
             <div id="progressBarContainer" style="display: none; flex: 1; max-width: 450px; margin-left: 10px;">
@@ -719,7 +719,7 @@
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
                         },
-                        body: JSON.stringify({ mode: 'simulated' })
+                        body: JSON.stringify({ mode: 'real' })
                     });
                 } catch (e) {
                     // Fallback to sync endpoint
@@ -727,7 +727,7 @@
                     response = await fetch('/api/run-scraper', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ mode: 'simulated' })
+                        body: JSON.stringify({ mode: 'real' })
                     });
                 }
                 

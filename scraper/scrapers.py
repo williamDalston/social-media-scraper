@@ -155,7 +155,7 @@ class RealScraper(BaseScraper):
             
             if not scraper:
                 logger.warning(
-                    f"Platform {account.platform} not supported. Falling back to simulation.",
+                    f"Platform {account.platform} not supported. No data will be collected.",
                     extra={
                         'account_key': account.account_key,
                         'platform': account.platform,
@@ -203,16 +203,17 @@ class RealScraper(BaseScraper):
             return None
 
 
-def get_scraper(mode='simulated'):
+def get_scraper(mode='real'):
     """
     Get a scraper instance.
     
     Args:
-        mode: 'simulated' for simulated data, 'real' for real scraping
+        mode: 'real' for real scraping (simulated mode disabled)
         
     Returns:
-        Scraper instance
+        Scraper instance (always RealScraper)
     """
-    if mode == 'real':
-        return RealScraper()
-    return SimulatedScraper()
+    # Only real mode is supported - no simulations
+    if mode != 'real':
+        logger.warning(f"Simulated mode requested but disabled. Using real scraper instead.")
+    return RealScraper()

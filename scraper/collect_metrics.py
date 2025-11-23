@@ -36,7 +36,7 @@ except:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-def simulate_metrics(db_path='social_media.db', mode='simulated', parallel=True, max_workers=5, progress_callback=None):
+def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_workers=5, progress_callback=None):
     """
     Collect metrics for all accounts.
     

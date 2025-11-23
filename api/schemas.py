@@ -116,7 +116,7 @@ class GridRowSchema(Schema):
 class ScraperRunRequestSchema(Schema):
     """Schema for scraper run request."""
     
-    mode = fields.Str(validate=validate.OneOf(['simulated', 'real']), missing='simulated')
+    mode = fields.Str(validate=validate.OneOf(['real']), missing='real')
 
 
 class CSVUploadResponseSchema(Schema):

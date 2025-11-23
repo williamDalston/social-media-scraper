@@ -536,12 +536,12 @@ def run_scraper():
         return jsonify({'error': 'Content-Type must be application/json'}), 400
     
     data = request.get_json()
-    mode = data.get('mode', 'simulated') if data else 'simulated'
+    # Default to 'real' mode - no simulations
+    mode = data.get('mode', 'real') if data else 'real'
     
-    # Validate mode
-    allowed_modes = ['simulated', 'real']
-    if mode not in allowed_modes:
-        return jsonify({'error': f'Invalid mode. Must be one of: {", ".join(allowed_modes)}'}), 400
+    # Only allow 'real' mode - simulations disabled
+    if mode != 'real':
+        return jsonify({'error': 'Only real mode is supported. Simulations are disabled.'}), 400
     try:
         from scraper.collect_metrics import simulate_metrics
         start_time = time.time()

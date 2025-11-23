@@ -109,15 +109,15 @@ class RunScraper(Resource):
         
         Only Admin and Editor roles can run the scraper.
         """
-        # Get mode from request body (default to 'simulated')
-        mode = 'simulated'
+        # Get mode from request body (default to 'real' - no simulations)
+        mode = 'real'
         if request.is_json:
             data = request.get_json() or {}
-            mode = data.get('mode', 'simulated')
+            mode = data.get('mode', 'real')
         
-        # Validate mode
-        if mode not in ['simulated', 'real']:
-            raise BadRequestError('Invalid mode. Must be "simulated" or "real"')
+        # Only allow 'real' mode - simulations disabled
+        if mode != 'real':
+            raise BadRequestError('Only real mode is supported. Simulations are disabled.')
         
         try:
             db_path = get_db_path()

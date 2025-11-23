@@ -18,7 +18,7 @@ from tasks.job_checkpointing import save_job_checkpoint, load_job_checkpoint
 logger = logging.getLogger(__name__)
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def scrape_account(self, account_key, mode='simulated', db_path=None):
+def scrape_account(self, account_key, mode='real', db_path=None):
     """
     Scrape metrics for a single account.
     
@@ -188,7 +188,7 @@ def scrape_account(self, account_key, mode='simulated', db_path=None):
             session.close()
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
-def scrape_all_accounts(self, mode='simulated', db_path=None):
+def scrape_all_accounts(self, mode='real', db_path=None):
     """
     Scrape metrics for all accounts.
     
@@ -307,7 +307,7 @@ def scrape_all_accounts(self, mode='simulated', db_path=None):
             raise exc
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
-def scrape_platform(self, platform, mode='simulated', db_path=None):
+def scrape_platform(self, platform, mode='real', db_path=None):
     """
     Scrape metrics for all accounts on a specific platform.
     

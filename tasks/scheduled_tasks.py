@@ -24,7 +24,7 @@ def daily_scrape_all():
     try:
         logger.info("Starting daily scrape_all scheduled task")
         db_path = os.getenv('DB_PATH', 'social_media.db')
-        mode = os.getenv('SCRAPER_MODE', 'simulated')
+        mode = os.getenv('SCRAPER_MODE', 'real')
         
         # Trigger the scrape_all_accounts task asynchronously
         result = scrape_all_accounts.delay(mode=mode, db_path=db_path)
