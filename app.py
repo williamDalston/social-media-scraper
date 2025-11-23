@@ -274,9 +274,10 @@ def api_summary():
             data.append({
                 'platform': account.platform,
                 'handle': account.handle,
-                'followers': snapshot.followers_count or 0,
-                'engagement': snapshot.engagements_total or 0,
-                'posts': snapshot.posts_count or 0
+                'org_name': account.org_name or '',
+                'followers': int(snapshot.followers_count or 0),
+                'engagement': int(snapshot.engagements_total or 0),
+                'posts': int(snapshot.posts_count or 0)
             })
         
         return jsonify(data)
@@ -297,9 +298,11 @@ def api_history(platform, handle):
     session = get_db_session()
     try:
         # Optimized query with index on platform and handle
-        account = session.query(DimAccount).filter_by(
-            platform=platform,
-            handle=handle
+        # Use case-insensitive matching to handle any case variations
+        # SQLite uses NOCASE collation by default for most operations, but be explicit
+        account = session.query(DimAccount).filter(
+            func.lower(DimAccount.platform) == func.lower(platform),
+            func.lower(DimAccount.handle) == func.lower(handle)
         ).first()
         
         if not account:
@@ -312,8 +315,8 @@ def api_history(platform, handle):
         
         data = {
             'dates': [h.snapshot_date.isoformat() for h in history],
-            'followers': [h.followers_count or 0 for h in history],
-            'engagement': [h.engagements_total or 0 for h in history]
+            'followers': [int(h.followers_count or 0) for h in history],
+            'engagement': [int(h.engagements_total or 0) for h in history]
         }
         
         return jsonify(data)
@@ -416,16 +419,16 @@ def api_grid():
         data = []
         for row in results:
             data.append([
-                row.platform,
-                row.handle,
-                row.org_name,
-                row.snapshot_date.isoformat() if row.snapshot_date else None,
-                row.followers_count or 0,
-                row.engagements_total or 0,
-                row.posts_count or 0,
-                row.likes_count or 0,
-                row.comments_count or 0,
-                row.shares_count or 0
+                row.platform or '',
+                row.handle or '',
+                row.org_name or '',
+                row.snapshot_date.isoformat() if row.snapshot_date else '',
+                int(row.followers_count or 0),
+                int(row.engagements_total or 0),
+                int(row.posts_count or 0),
+                int(row.likes_count or 0),
+                int(row.comments_count or 0),
+                int(row.shares_count or 0)
             ])
         
         return jsonify({
@@ -481,10 +484,10 @@ def upload_csv():
             # Sanitize organization name
             org = sanitize_string(org, 255)
             
-            # Check if exists - optimized query
-            existing = session.query(DimAccount).filter_by(
-                platform=platform,
-                handle=handle
+            # Check if exists - optimized query with case-insensitive matching
+            existing = session.query(DimAccount).filter(
+                func.lower(DimAccount.platform) == func.lower(platform),
+                func.lower(DimAccount.handle) == func.lower(handle)
             ).first()
             if not existing:
                 account = DimAccount(

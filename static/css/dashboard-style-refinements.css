@@ -1,0 +1,379 @@
+/* Style Refinements - Ensuring wise and sensible design choices */
+
+/* Fix Platform Badge Contrast Issues */
+.platform-badge.x,
+.platform-badge.tiktok {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Ensure proper contrast for all platform badges */
+.platform-badge {
+    /* Base styles ensure readability */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.platform-badge.instagram {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.platform-badge.youtube {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Refine button hover effects - less aggressive */
+.btn:hover:not(:disabled) {
+    transform: translateY(-1px); /* Reduced from -2px for subtlety */
+    box-shadow: var(--shadow-lg), 0 0 15px rgba(59, 130, 246, 0.2); /* Reduced glow */
+}
+
+/* Reduce excessive animations - respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Ensure consistent spacing scale */
+:root {
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+    --spacing-2xl: 48px;
+    
+    /* Consistent border radius scale */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    
+    /* Consistent font sizes */
+    --font-xs: 11px;
+    --font-sm: 12px;
+    --font-md: 14px;
+    --font-lg: 16px;
+    --font-xl: 18px;
+    --font-2xl: 24px;
+    --font-3xl: 32px;
+}
+
+/* Refine card hover effects - more subtle */
+.sidebar:hover,
+.chart-container:hover {
+    transform: translateY(-2px); /* Reduced from -4px */
+    box-shadow: var(--shadow-lg), 0 0 20px rgba(59, 130, 246, 0.15); /* Reduced glow */
+}
+
+/* Ensure account items don't move too much */
+.account-item:hover {
+    transform: translateX(2px); /* Reduced from 4px */
+}
+
+.account-item.active {
+    transform: translateX(2px); /* Consistent with hover */
+}
+
+/* Refine icon button rotation - less distracting */
+.btn-icon:hover,
+.btn-icon-small:hover {
+    transform: scale(1.05); /* Removed rotation, just scale */
+    box-shadow: var(--shadow-sm);
+}
+
+/* Ensure proper z-index hierarchy */
+:root {
+    --z-base: 1;
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-fixed: 300;
+    --z-modal-backdrop: 400;
+    --z-modal: 500;
+    --z-tooltip: 1000;
+    --z-notification: 2000;
+}
+
+/* Refine progress bar - ensure it's not too flashy */
+#progressBarFill {
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.3),
+                0 0 20px rgba(16, 185, 129, 0.2); /* Reduced glow */
+}
+
+/* Ensure empty states are not too animated */
+.empty-state-icon {
+    animation: float 4s ease-in-out infinite; /* Slower, less distracting */
+}
+
+/* Refine tooltip positioning - ensure they don't overlap */
+[data-tooltip]:hover::after {
+    max-width: 250px;
+    white-space: normal; /* Allow wrapping for long tooltips */
+    word-wrap: break-word;
+}
+
+/* Ensure stat items are consistent */
+.stat-item {
+    min-width: 120px; /* More reasonable minimum */
+}
+
+.stat-value {
+    font-size: var(--font-xl); /* Use consistent sizing */
+}
+
+.stat-label {
+    font-size: var(--font-xs);
+    margin-top: var(--spacing-xs);
+}
+
+/* Refine metric cards - ensure they're not too flashy */
+.metric-card:hover {
+    transform: translateY(-2px); /* Reduced from -4px */
+    box-shadow: var(--shadow-lg), 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+/* Ensure proper color contrast for text */
+.account-item.active {
+    color: #ffffff; /* Explicit white for better contrast */
+}
+
+.account-item.active .account-meta {
+    color: rgba(255, 255, 255, 0.9); /* Slightly transparent but readable */
+}
+
+/* Refine tab button active state */
+.tab-btn.active {
+    transform: translateY(-1px); /* Reduced from -2px */
+}
+
+/* Ensure consistent focus states */
+*:focus-visible {
+    outline-width: 2px;
+    outline-offset: 2px;
+    outline-style: solid;
+    outline-color: var(--accent);
+}
+
+/* Refine skeleton loaders - less distracting */
+.skeleton {
+    opacity: 0.7; /* Less prominent */
+}
+
+/* Ensure export menu items don't move too much */
+.export-option:hover,
+.user-menu-item:hover {
+    transform: translateX(2px); /* Reduced from 4px */
+}
+
+/* Refine legend items */
+.legend-item:hover {
+    transform: translateX(2px); /* Reduced from 4px */
+}
+
+/* Ensure proper spacing in header stats */
+#headerStats .stat-item {
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* Refine notification badge - ensure it's visible but not annoying */
+.notification-badge {
+    animation: pulse 3s infinite; /* Slower pulse */
+}
+
+/* Ensure consistent border widths */
+:root {
+    --border-thin: 1px;
+    --border-medium: 2px;
+    --border-thick: 4px;
+}
+
+/* Refine chart container top border */
+.chart-container::after {
+    height: var(--border-medium); /* Use consistent sizing */
+}
+
+/* Ensure proper line heights for readability */
+:root {
+    --line-height-tight: 1.2;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.8;
+}
+
+.account-handle {
+    line-height: var(--line-height-tight);
+}
+
+.account-meta {
+    line-height: var(--line-height-normal);
+}
+
+.empty-state-message {
+    line-height: var(--line-height-relaxed);
+}
+
+/* Refine shimmer animation - less frequent */
+#progressBarFill::after {
+    animation: shimmer 3s infinite; /* Slower shimmer */
+}
+
+/* Ensure proper color usage - semantic colors */
+:root {
+    --color-error: #ef4444;
+    --color-warning: #f59e0b;
+    --color-success: #10b981;
+    --color-info: #3b82f6;
+    --color-neutral: #6b7280;
+}
+
+/* Use semantic colors consistently */
+.metric-change.positive {
+    background: rgba(16, 185, 129, 0.15); /* Slightly more transparent */
+    color: var(--color-success);
+}
+
+.metric-change.negative {
+    background: rgba(239, 68, 68, 0.15); /* Slightly more transparent */
+    color: var(--color-error);
+}
+
+/* Ensure proper text shadows for readability on gradients */
+.header h1 {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* Ensure readability */
+}
+
+/* Refine loading spinner - ensure it's visible but not distracting */
+.loading-spinner {
+    border-width: var(--border-medium);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); /* Reduced glow */
+}
+
+/* Ensure consistent transition timing */
+:root {
+    --transition-fast: 0.15s;
+    --transition-normal: 0.3s;
+    --transition-slow: 0.5s;
+}
+
+/* Apply consistent transitions */
+.account-item,
+.btn,
+.tab-btn {
+    transition-duration: var(--transition-normal);
+}
+
+/* Ensure proper max-widths for readability */
+.empty-state-message,
+.tooltip {
+    max-width: 400px;
+}
+
+/* Refine error message - ensure it's attention-grabbing but not jarring */
+.error-message {
+    animation: shake 0.4s; /* Slightly faster, less annoying */
+}
+
+/* Ensure proper stacking context */
+.chart-container,
+.sidebar {
+    position: relative;
+    z-index: var(--z-base);
+}
+
+/* Refine scrollbar - ensure it's visible but not distracting */
+::-webkit-scrollbar-thumb {
+    border-width: var(--border-thin);
+}
+
+/* Ensure proper contrast for disabled states */
+.btn:disabled,
+.tab-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Refine success animation - ensure it's celebratory but not excessive */
+.success-animation {
+    animation: successCheck 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* Faster, smoother */
+}
+
+/* Ensure proper spacing in metric cards */
+.metric-card {
+    padding: var(--spacing-lg);
+}
+
+.metric-value {
+    font-size: var(--font-3xl);
+    margin: var(--spacing-sm) 0;
+}
+
+.metric-label {
+    font-size: var(--font-sm);
+    margin-top: var(--spacing-xs);
+}
+
+/* Refine platform badge sizing - ensure consistency */
+.platform-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-xs);
+    margin-right: var(--spacing-sm);
+}
+
+/* Ensure proper icon sizing */
+.btn-icon,
+.btn-icon-small {
+    padding: var(--spacing-sm);
+    font-size: var(--font-md);
+}
+
+/* Refine tab button padding */
+.tab-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+/* Ensure consistent button padding */
+.btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+/* Refine search input */
+.search-input {
+    padding: var(--spacing-sm) 40px var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-md);
+}
+
+/* Ensure proper chart header spacing */
+.chart-header {
+    padding-bottom: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.chart-title {
+    font-size: var(--font-xl);
+}
+
+/* Refine empty state spacing */
+.empty-state {
+    padding: var(--spacing-2xl) var(--spacing-lg);
+    min-height: 300px;
+}
+
+.empty-state-icon {
+    font-size: 64px;
+    margin-bottom: var(--spacing-lg);
+}
+
+.empty-state-title {
+    font-size: var(--font-2xl);
+    margin-bottom: var(--spacing-md);
+}
+
+.empty-state-message {
+    font-size: var(--font-lg);
+}
+

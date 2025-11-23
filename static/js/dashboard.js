@@ -161,10 +161,19 @@ async function refreshData(silent = false) {
             // Reload current account's history if one is selected
             const activeAccount = document.querySelector('.account-item.active');
             if (activeAccount) {
-                const handle = activeAccount.querySelector('.account-handle').textContent;
-                const meta = activeAccount.querySelector('.account-meta').textContent;
-                const platform = meta.split(' • ')[0];
-                await loadHistory(platform, handle);
+                // Get platform and handle from data attributes (more reliable)
+                const platform = activeAccount.getAttribute('data-platform');
+                const handle = activeAccount.getAttribute('data-handle');
+                if (platform && handle) {
+                    // Find the original account data to get proper case
+                    const account = allAccounts.find(acc => 
+                        (acc.platform || '').toLowerCase() === platform && 
+                        (acc.handle || '').toLowerCase() === handle
+                    );
+                    if (account) {
+                        await loadHistory(account.platform, account.handle);
+                    }
+                }
             }
         } else if (document.getElementById('grid-view').classList.contains('active')) {
             if (gridInstance) {
@@ -197,12 +206,15 @@ function updateHeaderStats(accounts) {
     const totalAccountsEl = document.getElementById('totalAccounts');
     const totalFollowersEl = document.getElementById('totalFollowers');
     
-    if (totalAccountsEl && accounts) {
-        totalAccountsEl.textContent = accounts.length.toLocaleString();
+    if (totalAccountsEl) {
+        const count = accounts && Array.isArray(accounts) ? accounts.length : 0;
+        totalAccountsEl.textContent = count.toLocaleString();
     }
     
-    if (totalFollowersEl && accounts) {
-        const total = accounts.reduce((sum, acc) => sum + (acc.followers || 0), 0);
+    if (totalFollowersEl) {
+        const total = accounts && Array.isArray(accounts) 
+            ? accounts.reduce((sum, acc) => sum + (parseInt(acc.followers) || 0), 0)
+            : 0;
         totalFollowersEl.textContent = total > 1000000 
             ? (total / 1000000).toFixed(1) + 'M'
             : total > 1000 
@@ -294,26 +306,27 @@ async function loadGrid() {
             server: {
                 url: '/api/grid',
                 then: (data) => {
-                    if (data.pagination) {
-                        return data.data.map(row => [
-                            row[0], row[1], row[2], row[3],
-                            (row[4] || 0).toLocaleString(), 
-                            (row[5] || 0).toLocaleString(), 
-                            row[6] || 0,
-                            (row[7] || 0).toLocaleString(), 
-                            (row[8] || 0).toLocaleString(), 
-                            (row[9] || 0).toLocaleString()
-                        ]);
-                    }
-                    return data.map(row => [
-                        row[0], row[1], row[2], row[3],
-                        (row[4] || 0).toLocaleString(), 
-                        (row[5] || 0).toLocaleString(), 
-                        row[6] || 0,
-                        (row[7] || 0).toLocaleString(), 
-                        (row[8] || 0).toLocaleString(), 
-                        (row[9] || 0).toLocaleString()
-                    ]);
+                    // Handle paginated response
+                    const rows = data.pagination ? data.data : (Array.isArray(data) ? data : []);
+                    return rows.map(row => {
+                        // Ensure all values are properly formatted
+                        return [
+                            row[0] || '', // Platform
+                            row[1] || '', // Handle
+                            row[2] || '', // Org
+                            row[3] || '', // Date
+                            typeof row[4] === 'number' ? row[4].toLocaleString() : (parseInt(row[4]) || 0).toLocaleString(), // Followers
+                            typeof row[5] === 'number' ? row[5].toLocaleString() : (parseInt(row[5]) || 0).toLocaleString(), // Engagement
+                            typeof row[6] === 'number' ? row[6] : (parseInt(row[6]) || 0), // Posts
+                            typeof row[7] === 'number' ? row[7].toLocaleString() : (parseInt(row[7]) || 0).toLocaleString(), // Likes
+                            typeof row[8] === 'number' ? row[8].toLocaleString() : (parseInt(row[8]) || 0).toLocaleString(), // Comments
+                            typeof row[9] === 'number' ? row[9].toLocaleString() : (parseInt(row[9]) || 0).toLocaleString()  // Shares
+                        ];
+                    });
+                },
+                total: (data) => {
+                    // Return total count for pagination
+                    return data.pagination ? data.pagination.total : (Array.isArray(data) ? data.length : 0);
                 }
             },
             search: true,
@@ -377,13 +390,14 @@ async function loadAccounts() {
                 </div>
             `;
             allAccounts = [];
+            updateHeaderStats([]);
             return;
         }
 
         // Store all accounts for filtering
         allAccounts = data.sort((a, b) => (b.followers || 0) - (a.followers || 0));
         
-        // Update header stats
+        // Update header stats with real data
         updateHeaderStats(allAccounts);
         
         // Render accounts
@@ -507,10 +521,17 @@ function filterAccounts(query) {
     const filtered = allAccounts.filter(acc => {
         const handle = (acc.handle || '').toLowerCase();
         const platform = (acc.platform || '').toLowerCase();
-        return handle.includes(searchTerm) || platform.includes(searchTerm);
+        const org = (acc.org_name || '').toLowerCase();
+        // Search across handle, platform, and organization name
+        return handle.includes(searchTerm) || 
+               platform.includes(searchTerm) || 
+               org.includes(searchTerm);
     });
 
     renderAccounts(filtered);
+    
+    // Update header stats to reflect filtered results
+    updateHeaderStats(filtered);
 }
 
 const debouncedLoadHistory = debounce(loadHistory, 300);
@@ -530,7 +551,10 @@ async function loadHistory(platform, handle) {
         // Lazy load Chart.js
         await loadChart();
         
-        const data = await cachedFetch(`/api/history/${platform}/${handle}`);
+        // URL encode platform and handle to handle special characters
+        const encodedPlatform = encodeURIComponent(platform);
+        const encodedHandle = encodeURIComponent(handle);
+        const data = await cachedFetch(`/api/history/${encodedPlatform}/${encodedHandle}`);
         
         chartLoadTimeout = setTimeout(() => {
             updateCharts(handle, data);
@@ -619,13 +643,18 @@ function updateCharts(handle, data) {
     if (followersChart) followersChart.destroy();
     if (engagementChart) engagementChart.destroy();
 
+    // Ensure data arrays are valid numbers
+    const followersData = (data.followers || []).map(v => parseInt(v) || 0);
+    const engagementData = (data.engagement || []).map(v => parseInt(v) || 0);
+    const dates = data.dates || [];
+    
     followersChart = new Chart(ctxFollowers, {
         type: 'line',
         data: {
-            labels: data.dates || [],
+            labels: dates,
             datasets: [{
                 label: `Followers: ${handle}`,
-                data: data.followers || [],
+                data: followersData,
                 borderColor: '#3b82f6',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
@@ -703,10 +732,10 @@ function updateCharts(handle, data) {
     engagementChart = new Chart(ctxEngagement, {
         type: 'bar',
         data: {
-            labels: data.dates || [],
+            labels: dates,
             datasets: [{
                 label: `Daily Engagement`,
-                data: data.engagement || [],
+                data: engagementData,
                 backgroundColor: '#10b981',
                 borderRadius: 4,
                 borderSkipped: false
@@ -818,10 +847,19 @@ function resetChartZoom(chartId) {
         // Fallback: reload chart
         const activeAccount = document.querySelector('.account-item.active');
         if (activeAccount) {
-            const handle = activeAccount.querySelector('.account-handle').textContent;
-            const meta = activeAccount.querySelector('.account-meta').textContent;
-            const platform = meta.split(' • ')[0];
-            loadHistory(platform, handle);
+            // Get platform and handle from data attributes (more reliable)
+            const platform = activeAccount.getAttribute('data-platform');
+            const handle = activeAccount.getAttribute('data-handle');
+            if (platform && handle) {
+                // Find the original account data to get proper case
+                const account = allAccounts.find(acc => 
+                    (acc.platform || '').toLowerCase() === platform && 
+                    (acc.handle || '').toLowerCase() === handle
+                );
+                if (account) {
+                    loadHistory(account.platform, account.handle);
+                }
+            }
         }
     }
 

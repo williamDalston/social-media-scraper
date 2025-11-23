@@ -43,12 +43,11 @@
     border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
-.platform-badge.x { background: rgba(0, 0, 0, 0.2); color: #000; border-color: rgba(0, 0, 0, 0.3); }
+/* Platform badges with proper contrast - refined in dashboard-style-refinements.css */
 .platform-badge.instagram { background: rgba(225, 48, 108, 0.2); color: #e1306c; border-color: rgba(225, 48, 108, 0.3); }
 .platform-badge.facebook { background: rgba(24, 119, 242, 0.2); color: #1877f2; border-color: rgba(24, 119, 242, 0.3); }
 .platform-badge.linkedin { background: rgba(0, 119, 181, 0.2); color: #0077b5; border-color: rgba(0, 119, 181, 0.3); }
 .platform-badge.youtube { background: rgba(255, 0, 0, 0.2); color: #ff0000; border-color: rgba(255, 0, 0, 0.3); }
-.platform-badge.tiktok { background: rgba(0, 0, 0, 0.2); color: #000; border-color: rgba(0, 0, 0, 0.3); }
 .platform-badge.reddit { background: rgba(255, 69, 0, 0.2); color: #ff4500; border-color: rgba(255, 69, 0, 0.3); }
 
 /* Metric Cards */

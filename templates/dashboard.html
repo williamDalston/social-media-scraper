@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="/static/css/dashboard-enhancements.css">
     <link rel="stylesheet" href="/static/css/dashboard-ui-enhancements.css">
     <link rel="stylesheet" href="/static/css/dashboard-interactive.css">
+    <link rel="stylesheet" href="/static/css/dashboard-style-refinements.css">
     <style>
         :root {
             --bg-color: #0f172a;
@@ -321,14 +322,14 @@
                     <input type="checkbox" id="autoRefreshToggle" checked aria-label="Enable auto-refresh">
                     <span>Auto-refresh</span>
                 </label>
-                <div id="headerStats" style="display: flex; gap: 16px; margin-left: auto;">
-                    <div class="stat-item" style="min-width: auto; padding: 8px 16px;">
-                        <div class="stat-value" id="totalAccounts" style="font-size: 18px;">-</div>
-                        <div class="stat-label" style="font-size: 10px;">Accounts</div>
+                <div id="headerStats" style="display: flex; gap: 12px; margin-left: auto;">
+                    <div class="stat-item" style="min-width: auto; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);">
+                        <div class="stat-value" id="totalAccounts" style="font-size: 18px; color: white;">-</div>
+                        <div class="stat-label" style="font-size: 10px; color: rgba(255, 255, 255, 0.8);">Accounts</div>
                     </div>
-                    <div class="stat-item" style="min-width: auto; padding: 8px 16px;">
-                        <div class="stat-value" id="totalFollowers" style="font-size: 18px;">-</div>
-                        <div class="stat-label" style="font-size: 10px;">Followers</div>
+                    <div class="stat-item" style="min-width: auto; padding: 8px 16px; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); backdrop-filter: blur(10px);">
+                        <div class="stat-value" id="totalFollowers" style="font-size: 18px; color: white;">-</div>
+                        <div class="stat-label" style="font-size: 10px; color: rgba(255, 255, 255, 0.8);">Followers</div>
                     </div>
                 </div>
             </div>
