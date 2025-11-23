@@ -8,6 +8,7 @@
     <!-- Lazy loaded via dashboard.js -->
     <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/dashboard-enhancements.css">
     <style>
         :root {
             --bg-color: #0f172a;
@@ -273,49 +274,55 @@
 </head>
 
 <body>
-    <div class="header">
+    <header class="header" role="banner">
         <div>
             <h1>HHS Social Media Command Center</h1>
             <div class="header-meta">
-                <span id="lastRefresh" class="refresh-indicator">Never refreshed</span>
+                <span id="lastRefresh" class="refresh-indicator" aria-live="polite" aria-atomic="true">Never refreshed</span>
                 <button id="refreshBtn" class="btn-icon" onclick="refreshData()" aria-label="Refresh data" title="Refresh data (R)">
-                    <span id="refreshIcon">🔄</span>
+                    <span id="refreshIcon" aria-hidden="true">🔄</span>
                 </button>
-                <label class="auto-refresh-toggle">
-                    <input type="checkbox" id="autoRefreshToggle" checked>
+                <label class="auto-refresh-toggle" data-tooltip="Automatically refresh data every 5 minutes">
+                    <input type="checkbox" id="autoRefreshToggle" checked aria-label="Enable auto-refresh">
                     <span>Auto-refresh</span>
                 </label>
             </div>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <button onclick="document.getElementById('fileInput').click()" class="btn"
-                style="background-color: #475569;">Upload CSV</button>
-            <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)">
+        <nav style="display: flex; gap: 10px; align-items: center;" role="toolbar" aria-label="Main actions">
+                <button onclick="document.getElementById('fileInput').click()" class="btn"
+                style="background-color: #475569;" aria-label="Upload CSV file" data-tooltip="Upload a CSV file with social media accounts to track">Upload CSV</button>
+            <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)" aria-label="CSV file input">
 
-            <button onclick="runScraper()" class="btn" id="runScraperBtn">Run Scraper (Sim)</button>
-            <a href="/api/download" class="btn">Download All Data (CSV)</a>
-        </div>
-    </div>
+            <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect metrics" data-tooltip="Run the scraper to collect metrics from all tracked accounts. This may take a few minutes.">Run Scraper (Sim)</button>
+            <a href="/api/download" class="btn" aria-label="Download all data as CSV">Download All Data (CSV)</a>
+            <button onclick="keyboardShortcuts.toggleHelp()" class="btn-icon" title="Keyboard Shortcuts (?)" aria-label="Show keyboard shortcuts">
+                <span aria-hidden="true">⌨️</span>
+            </button>
+        </nav>
+    </header>
 
-    <div class="tabs">
-        <button class="tab-btn active" data-tab="charts" onclick="dashboard.switchTab('charts')">Charts & Analytics</button>
-        <button class="tab-btn" data-tab="grid" onclick="dashboard.switchTab('grid')">Full Data Grid</button>
-    </div>
+    <nav class="tabs" role="tablist" aria-label="View selection">
+        <button class="tab-btn active" data-tab="charts" onclick="dashboard.switchTab('charts')" role="tab" aria-selected="true" aria-controls="charts-view" id="tab-charts">Charts & Analytics</button>
+        <button class="tab-btn" data-tab="grid" onclick="dashboard.switchTab('grid')" role="tab" aria-selected="false" aria-controls="grid-view" id="tab-grid">Full Data Grid</button>
+    </nav>
 
     <!-- Charts View -->
-    <div id="charts-view" class="view-section active">
+    <main id="charts-view" class="view-section active" role="main" aria-labelledby="tab-charts">
         <div class="grid">
-            <div class="sidebar" id="accountList">
+            <aside class="sidebar" id="accountList" role="complementary" aria-label="Account list">
                 <!-- Search/Filter Input -->
                 <div class="sidebar-search">
+                    <label for="accountSearch" class="sr-only">Search accounts</label>
                     <input 
                         type="text" 
                         id="accountSearch" 
                         class="search-input" 
                         placeholder="Search accounts..."
                         aria-label="Search accounts"
+                        aria-describedby="search-help"
                     />
-                    <span class="search-icon">🔍</span>
+                    <span class="search-icon" aria-hidden="true">🔍</span>
+                    <span id="search-help" class="sr-only">Type to filter accounts by handle or platform</span>
                 </div>
                 <!-- Enhanced skeleton loader while loading -->
                 <div id="accountListSkeleton">
@@ -344,8 +351,19 @@
                 <div id="accountListContent"></div>
             </div>
 
-            <div class="main-content">
-                <div class="chart-container" id="followersChartContainer">
+            <div class="main-content" role="region" aria-label="Charts and analytics">
+                <section class="chart-container" id="followersChartContainer" aria-label="Follower growth chart">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Follower Growth</h3>
+                        <div class="chart-actions" id="followersChartActions" style="display: none;" role="toolbar" aria-label="Chart actions">
+                            <button class="btn-icon-small" onclick="exportChart('followersChart')" title="Export as PNG" aria-label="Export follower growth chart as PNG">
+                                <span aria-hidden="true">📥</span>
+                            </button>
+                            <button class="btn-icon-small" onclick="resetChartZoom('followersChart')" title="Reset Zoom" aria-label="Reset chart zoom">
+                                <span aria-hidden="true">🔍</span>
+                            </button>
+                        </div>
+                    </div>
                     <div class="loading-overlay" id="followersLoading" style="display: none;">
                         <div style="text-align: center;">
                             <div class="loading-spinner"></div>
@@ -353,9 +371,20 @@
                         </div>
                     </div>
                     <div id="followersChartSkeleton" class="skeleton skeleton-chart shimmer" style="display: none;"></div>
-                    <canvas id="followersChart"></canvas>
-                </div>
-                <div class="chart-container" id="engagementChartContainer">
+                    <canvas id="followersChart" aria-label="Follower growth over time"></canvas>
+                </section>
+                <section class="chart-container" id="engagementChartContainer" aria-label="Engagement volume chart">
+                    <div class="chart-header">
+                        <h3 class="chart-title">Daily Engagement Volume</h3>
+                        <div class="chart-actions" id="engagementChartActions" style="display: none;" role="toolbar" aria-label="Chart actions">
+                            <button class="btn-icon-small" onclick="exportChart('engagementChart')" title="Export as PNG" aria-label="Export engagement chart as PNG">
+                                <span aria-hidden="true">📥</span>
+                            </button>
+                            <button class="btn-icon-small" onclick="resetChartZoom('engagementChart')" title="Reset Zoom" aria-label="Reset chart zoom">
+                                <span aria-hidden="true">🔍</span>
+                            </button>
+                        </div>
+                    </div>
                     <div class="loading-overlay" id="engagementLoading" style="display: none;">
                         <div style="text-align: center;">
                             <div class="loading-spinner"></div>
@@ -387,6 +416,12 @@
         }
     </script>
     
+    <!-- Chart.js Zoom Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Keyboard Shortcuts -->
+    <script src="/static/js/keyboard-shortcuts.js"></script>
+    <!-- Tooltip System -->
+    <script src="/static/js/tooltip.js"></script>
     <!-- Toast Notification System -->
     <script src="/static/js/toast.js"></script>
     <!-- Error Handler -->

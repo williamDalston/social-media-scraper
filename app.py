@@ -143,6 +143,20 @@ try:
 except ImportError:
     pass
 
+# Register compliance blueprint
+try:
+    from api.compliance import compliance_bp
+    app.register_blueprint(compliance_bp)
+except ImportError:
+    pass
+
+# Register performance SLA blueprint
+try:
+    from api.performance_slas import performance_sla_bp
+    app.register_blueprint(performance_sla_bp)
+except ImportError:
+    pass
+
 # Apply rate limiting to auth routes after blueprint registration
 # Login endpoint: 5 requests per minute per IP
 if 'login' in auth_bp.view_functions:

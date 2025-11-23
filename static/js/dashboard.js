@@ -6,9 +6,20 @@
 let Chart = null;
 const loadChart = () => {
     if (!Chart) {
-        return import('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js').then(module => {
-            Chart = module.default || module;
-            return Chart;
+        return new Promise((resolve, reject) => {
+            // Load Chart.js
+            const chartScript = document.createElement('script');
+            chartScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+            chartScript.onload = () => {
+                Chart = window.Chart;
+                // Register zoom plugin if available
+                if (window.ChartZoom) {
+                    Chart.register(window.ChartZoom);
+                }
+                resolve(Chart);
+            };
+            chartScript.onerror = reject;
+            document.head.appendChild(chartScript);
         });
     }
     return Promise.resolve(Chart);
@@ -214,18 +225,29 @@ function setupTabs() {
 }
 
 function switchTab(tab) {
-    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+    });
     document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
 
     if (tab === 'charts') {
-        document.querySelector(`[data-tab="charts"]`).classList.add('active');
+        const chartsTab = document.querySelector(`[data-tab="charts"]`);
+        chartsTab.classList.add('active');
+        chartsTab.setAttribute('aria-selected', 'true');
         document.getElementById('charts-view').classList.add('active');
+        // Focus management
+        chartsTab.focus();
     } else if (tab === 'grid') {
-        document.querySelector(`[data-tab="grid"]`).classList.add('active');
+        const gridTab = document.querySelector(`[data-tab="grid"]`);
+        gridTab.classList.add('active');
+        gridTab.setAttribute('aria-selected', 'true');
         document.getElementById('grid-view').classList.add('active');
         if (!gridInstance) {
             loadGrid();
         }
+        // Focus management
+        gridTab.focus();
     }
 }
 
@@ -560,20 +582,73 @@ function updateCharts(handle, data) {
                 borderColor: '#3b82f6',
                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
-                tension: 0.4
+                tension: 0.4,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#3b82f6',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 750 },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             plugins: {
-                title: { display: true, text: 'Follower Growth', color: '#f8fafc' },
-                legend: { labels: { color: '#94a3b8' } }
+                title: { 
+                    display: true, 
+                    text: 'Follower Growth', 
+                    color: '#f8fafc',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: { 
+                    labels: { color: '#94a3b8' },
+                    display: true
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#94a3b8',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+                        }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x'
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    }
+                }
             },
             scales: {
-                y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                y: { 
+                    grid: { color: '#334155' }, 
+                    ticks: { 
+                        color: '#94a3b8',
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    } 
+                },
+                x: { 
+                    grid: { display: false }, 
+                    ticks: { color: '#94a3b8' } 
+                }
             }
         }
     });
@@ -586,23 +661,122 @@ function updateCharts(handle, data) {
                 label: `Daily Engagement`,
                 data: data.engagement || [],
                 backgroundColor: '#10b981',
-                borderRadius: 4
+                borderRadius: 4,
+                borderSkipped: false
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: { duration: 750 },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
             plugins: {
-                title: { display: true, text: 'Daily Engagement Volume', color: '#f8fafc' },
-                legend: { labels: { color: '#94a3b8' } }
+                title: { 
+                    display: true, 
+                    text: 'Daily Engagement Volume', 
+                    color: '#f8fafc',
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: { 
+                    labels: { color: '#94a3b8' },
+                    display: true
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(30, 41, 59, 0.95)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#94a3b8',
+                    borderColor: '#334155',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: true,
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}`;
+                        }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: { enabled: true },
+                        pinch: { enabled: true },
+                        mode: 'x'
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'x'
+                    }
+                }
             },
             scales: {
-                y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
+                y: { 
+                    grid: { color: '#334155' }, 
+                    ticks: { 
+                        color: '#94a3b8',
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    } 
+                },
+                x: { 
+                    grid: { display: false }, 
+                    ticks: { color: '#94a3b8' } 
+                }
             }
         }
     });
+
+    // Add chart export buttons
+    addChartExportButtons(handle);
+}
+
+function addChartExportButtons(handle) {
+    const followersActions = document.getElementById('followersChartActions');
+    const engagementActions = document.getElementById('engagementChartActions');
+    if (followersActions) followersActions.style.display = 'flex';
+    if (engagementActions) engagementActions.style.display = 'flex';
+}
+
+function exportChart(chartId) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return;
+
+    const chart = chartId === 'followersChart' ? followersChart : engagementChart;
+    if (!chart) return;
+
+    const url = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `${chartId}_${new Date().toISOString().split('T')[0]}.png`;
+    link.href = url;
+    link.click();
+
+    if (window.toast) {
+        toast.success('Chart exported successfully');
+    }
+}
+
+function resetChartZoom(chartId) {
+    const chart = chartId === 'followersChart' ? followersChart : engagementChart;
+    if (!chart) return;
+
+    if (chart.resetZoom) {
+        chart.resetZoom();
+    } else {
+        // Fallback: reload chart
+        const activeAccount = document.querySelector('.account-item.active');
+        if (activeAccount) {
+            const handle = activeAccount.querySelector('.account-handle').textContent;
+            const meta = activeAccount.querySelector('.account-meta').textContent;
+            const platform = meta.split(' • ')[0];
+            loadHistory(platform, handle);
+        }
+    }
+
+    if (window.toast) {
+        toast.info('Chart zoom reset');
+    }
 }
 
 // Export for use in HTML
@@ -614,4 +788,7 @@ window.dashboard = {
     filterAccounts,
     refreshData
 };
+
+window.exportChart = exportChart;
+window.resetChartZoom = resetChartZoom;
 
