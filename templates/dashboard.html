@@ -709,12 +709,22 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    if (useAsync && result.job_id && window.progressBar) {
+                    if (useAsync && result.job_id) {
                         // Show progress bar for async jobs
-                        window.progressBar.show(result.job_id);
-                        toast.success('Scraper started! Progress will be shown below.');
+                        if (window.progressBar) {
+                            window.progressBar.show(result.job_id);
+                            toast.success('Scraper started! Progress will be shown below.');
+                        } else {
+                            console.warn('Progress bar not available');
+                            toast.success('Scraper started! (Progress tracking unavailable)');
+                        }
+                    } else if (!useAsync && window.progressBar) {
+                        // Sync endpoint - show a simple progress indicator
+                        // Since sync endpoint completes immediately, just show completion
+                        toast.success(result.message || 'Scraper completed successfully!');
+                        if (window.dashboard) window.dashboard.loadAccounts();
                     } else {
-                        // Sync endpoint - show completion message
+                        // Fallback if progress bar not available
                         toast.success(result.message || 'Scraper completed successfully!');
                         if (window.dashboard) window.dashboard.loadAccounts();
                     }

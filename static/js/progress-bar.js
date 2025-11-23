@@ -24,12 +24,17 @@ class ProgressBar {
     }
     
     show(jobId) {
-        if (!this.container) return;
+        if (!this.container) {
+            console.warn('Progress bar container not found');
+            return;
+        }
         
         this.currentJobId = jobId;
         this.startTime = Date.now();
         this.container.style.display = 'flex';
         this.update(0, 'Initializing...', 0, 0, 0);
+        
+        console.log('Progress bar shown for job:', jobId);
         
         // Start polling for progress updates
         this.startPolling();
