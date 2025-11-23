@@ -153,6 +153,9 @@ social-media-scraper/
 - **[PHASE_3_OVERVIEW.md](./PHASE_3_OVERVIEW.md)** - Phase 3 tasks overview
 - **[agent_tasks/](./agent_tasks/)** - Detailed agent task files
 
+### Vision & Strategy
+- **[VISION.md](./VISION.md)** - Project vision, future direction, and strategic roadmap (Living Document)
+
 ---
 
 ## 🔧 Configuration
@@ -480,6 +483,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - 🤝 [Contributing Guide](./CONTRIBUTING.md) - How to contribute
 - 📊 [Phase 3 Overview](./PHASE_3_OVERVIEW.md) - Phase 3 tasks
 - 🎯 [Agent Assignments](./AGENT_ASSIGNMENTS.md) - Agent task overview
+- 🎯 [Vision & Future](./VISION.md) - Project vision and strategic roadmap
 
 ---
 

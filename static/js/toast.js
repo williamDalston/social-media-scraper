@@ -56,7 +56,12 @@ class ToastManager {
     }
 
     success(message, duration = 5000) {
-        return this.show(message, 'success', duration);
+        const toast = this.show(message, 'success', duration);
+        // Add success animation
+        if (toast) {
+            toast.classList.add('success-animation');
+        }
+        return toast;
     }
 
     error(message, duration = 7000) {

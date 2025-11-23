@@ -62,6 +62,40 @@ jobs:
         with:
           file: ./coverage.xml
 
+  validation:
+    name: System Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run pre-flight checks
+        run: |
+          chmod +x scripts/preflight-check.sh
+          ./scripts/preflight-check.sh --skip-optional || true
+      
+      - name: Run system validation
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci
+        run: |
+          python config/system_validation.py || true
+      
+      - name: Run pipeline validation
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          JWT_SECRET_KEY: test-jwt-secret-key-for-ci
+        run: |
+          python -c "from config.pipeline_checks import validate_pipeline; validate_pipeline()" || true
+
   security:
     name: Security Scanning
     runs-on: ubuntu-latest

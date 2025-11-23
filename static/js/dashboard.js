@@ -89,6 +89,10 @@ let engagementChart = null;
 let gridInstance = null;
 let chartLoadTimeout = null;
 
+// Make charts available globally for export
+window.followersChart = followersChart;
+window.engagementChart = engagementChart;
+
 // Auto-refresh management
 let autoRefreshInterval = null;
 let lastRefreshTime = null;
@@ -730,6 +734,10 @@ function updateCharts(handle, data) {
 
     // Add chart export buttons
     addChartExportButtons(handle);
+    
+    // Update global references
+    window.followersChart = followersChart;
+    window.engagementChart = engagementChart;
 }
 
 function addChartExportButtons(handle) {

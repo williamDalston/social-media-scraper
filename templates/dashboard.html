@@ -294,7 +294,30 @@
             <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)" aria-label="CSV file input">
 
             <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect metrics" data-tooltip="Run the scraper to collect metrics from all tracked accounts. This may take a few minutes.">Run Scraper (Sim)</button>
-            <a href="/api/download" class="btn" aria-label="Download all data as CSV">Download All Data (CSV)</a>
+            <div class="export-menu">
+                <button class="btn" onclick="showExportMenu()" aria-label="Export data" data-tooltip="Export data in various formats">Export Data ▼</button>
+                <div id="exportMenu" class="export-dropdown" style="display: none;">
+                    <button onclick="exportData('csv')" class="export-option">📄 Export as CSV</button>
+                    <button onclick="exportData('json')" class="export-option">📋 Export as JSON</button>
+                    <button onclick="exportData('xlsx')" class="export-option">📊 Export as Excel</button>
+                    <button onclick="exportCharts()" class="export-option">📈 Export Charts</button>
+                </div>
+            </div>
+            <div class="user-menu">
+                <button class="btn-icon" onclick="toggleUserMenu()" aria-label="User menu" title="User menu">
+                    <span aria-hidden="true">👤</span>
+                </button>
+                <div id="userMenu" class="user-dropdown" style="display: none;">
+                    <div class="user-menu-header">
+                        <strong>User Menu</strong>
+                    </div>
+                    <button onclick="showSettings()" class="user-menu-item">⚙️ Settings</button>
+                    <button onclick="window.location.href='/api/auth/logout'" class="user-menu-item">🚪 Logout</button>
+                </div>
+            </div>
+            <button id="themeToggle" onclick="themeManager.toggle()" class="btn-icon" title="Toggle theme" aria-label="Toggle dark/light mode">
+                🌙
+            </button>
             <button onclick="keyboardShortcuts.toggleHelp()" class="btn-icon" title="Keyboard Shortcuts (?)" aria-label="Show keyboard shortcuts">
                 <span aria-hidden="true">⌨️</span>
             </button>
@@ -422,6 +445,8 @@
     <script src="/static/js/keyboard-shortcuts.js"></script>
     <!-- Tooltip System -->
     <script src="/static/js/tooltip.js"></script>
+    <!-- Theme Toggle -->
+    <script src="/static/js/theme-toggle.js"></script>
     <!-- Toast Notification System -->
     <script src="/static/js/toast.js"></script>
     <!-- Error Handler -->
@@ -479,6 +504,116 @@
         function refreshData() {
             if (window.dashboard) {
                 window.dashboard.refreshData();
+            }
+        }
+
+        function showExportMenu() {
+            const menu = document.getElementById('exportMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function exportData(format) {
+            document.getElementById('exportMenu').style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/summary');
+                const data = await response.json();
+                
+                if (format === 'csv') {
+                    // CSV export
+                    const csv = convertToCSV(data);
+                    downloadFile(csv, 'hhs_social_media_data.csv', 'text/csv');
+                } else if (format === 'json') {
+                    // JSON export
+                    downloadFile(JSON.stringify(data, null, 2), 'hhs_social_media_data.json', 'application/json');
+                } else if (format === 'xlsx') {
+                    // Excel export (simplified - would need a library for full Excel support)
+                    toast.info('Excel export requires additional library. Using CSV format instead.');
+                    const csv = convertToCSV(data);
+                    downloadFile(csv, 'hhs_social_media_data.csv', 'text/csv');
+                }
+                
+                if (window.toast) {
+                    toast.success(`Data exported as ${format.toUpperCase()}`);
+                }
+            } catch (error) {
+                if (window.toast) {
+                    toast.error('Export failed: ' + error.message);
+                }
+            }
+        }
+
+        function convertToCSV(data) {
+            const headers = ['Platform', 'Handle', 'Followers', 'Engagement', 'Posts'];
+            const rows = data.map(item => [
+                item.platform || '',
+                item.handle || '',
+                item.followers || 0,
+                item.engagement || 0,
+                item.posts || 0
+            ]);
+            
+            return [
+                headers.join(','),
+                ...rows.map(row => row.join(','))
+            ].join('\n');
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function exportCharts() {
+            document.getElementById('exportMenu').style.display = 'none';
+            if (followersChart && engagementChart) {
+                exportChart('followersChart');
+                setTimeout(() => exportChart('engagementChart'), 500);
+                if (window.toast) {
+                    toast.success('Charts exported');
+                }
+            } else {
+                if (window.toast) {
+                    toast.warning('No charts available to export');
+                }
+            }
+        }
+
+        // Close export menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('exportMenu');
+            const button = e.target.closest('.export-menu button');
+            if (menu && !menu.contains(e.target) && !button) {
+                menu.style.display = 'none';
+            }
+            
+            const userMenu = document.getElementById('userMenu');
+            const userButton = e.target.closest('.user-menu button');
+            if (userMenu && !userMenu.contains(e.target) && !userButton) {
+                userMenu.style.display = 'none';
+            }
+        });
+
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenu');
+            menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function showSettings() {
+            document.getElementById('userMenu').style.display = 'none';
+            if (window.modal) {
+                modal.alert({
+                    title: 'Settings',
+                    message: 'Settings panel coming soon! You can adjust theme, auto-refresh, and other preferences here.',
+                    buttonText: 'OK'
+                });
+            } else {
+                alert('Settings panel coming soon!');
             }
         }
 

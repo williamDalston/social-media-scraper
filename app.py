@@ -150,6 +150,13 @@ try:
 except ImportError:
     pass
 
+# Register system health blueprint
+try:
+    from api.system_health import system_health_bp
+    app.register_blueprint(system_health_bp)
+except ImportError:
+    pass
+
 # Register performance SLA blueprint
 try:
     from api.performance_slas import performance_sla_bp
@@ -1109,12 +1116,34 @@ if __name__ == '__main__':
     from auth.utils import ensure_admin_exists
     ensure_admin_exists()
     
+    # Run system validation on startup
+    try:
+        from config.system_validation import validate_system_on_startup
+        logger.info("Running system validation...")
+        # In production, this will exit on critical failures
+        # In development, it will log warnings but continue
+        validate_system_on_startup(skip_optional=False)
+        logger.info("System validation passed")
+    except SystemExit:
+        logger.error("System validation failed with critical errors. Exiting.")
+        raise
+    except Exception as e:
+        logger.warning(f"System validation error: {e}")
+    
     # Initialize distributed tracing with app
     try:
         from config.tracing_config import init_tracing
         init_tracing(app, service_name='hhs-social-media-scraper')
     except:
         pass
+    
+    # Start continuous monitoring
+    try:
+        from config.continuous_monitoring import start_monitoring
+        start_monitoring()
+        logger.info("Continuous monitoring started")
+    except Exception as e:
+        logger.warning(f"Could not start continuous monitoring: {e}")
     
     # Set up periodic critical issue checking
     try:

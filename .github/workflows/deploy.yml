@@ -51,10 +51,45 @@ jobs:
           base: ${{ github.event.repository.default_branch }}
           head: HEAD
 
+  pre-deploy-validation:
+    name: Pre-Deploy Validation
+    runs-on: ubuntu-latest
+    needs: security-scan
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+      
+      - name: Run pre-flight checks
+        run: |
+          chmod +x scripts/preflight-check.sh
+          ./scripts/preflight-check.sh --strict
+      
+      - name: Run system validation
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        run: |
+          python config/system_validation.py
+      
+      - name: Run pipeline validation
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        run: |
+          python -c "from config.pipeline_checks import validate_pipeline; all_passed, summary = validate_pipeline(); exit(0 if all_passed else 1)"
+
   build:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    needs: security-scan
+    needs: [security-scan, pre-deploy-validation]
     steps:
       - uses: actions/checkout@v4
       
