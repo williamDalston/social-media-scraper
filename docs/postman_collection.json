@@ -1,0 +1,302 @@
+{
+  "info": {
+    "name": "HHS Social Media API",
+    "description": "API collection for HHS Social Media Scraper - Social media metrics and account management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "agent-7"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "api_version",
+      "value": "v1",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "username",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.access_token) {",
+                  "        pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"{{username}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login to get access token"
+          },
+          "response": []
+        },
+        {
+          "name": "Register",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"newuser\",\n  \"email\": \"user@example.com\",\n  \"password\": \"securepassword\",\n  \"role\": \"Viewer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register new user (Admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get current user information"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Metrics",
+      "item": [
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/metrics/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "metrics", "summary"]
+            },
+            "description": "Get summary metrics for all accounts at latest snapshot date"
+          },
+          "response": []
+        },
+        {
+          "name": "Get History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/metrics/history/X/@hhsgov",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "metrics", "history", "X", "@hhsgov"],
+              "description": "Get historical metrics for a specific account. Replace X and @hhsgov with platform and handle."
+            },
+            "description": "Get historical metrics for a specific account"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Grid Data",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/metrics/grid",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "metrics", "grid"]
+            },
+            "description": "Get all metrics data in grid format"
+          },
+          "response": []
+        },
+        {
+          "name": "Download CSV",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/metrics/download",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "metrics", "download"]
+            },
+            "description": "Download all metrics data as CSV file"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "List Accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/accounts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "accounts"]
+            },
+            "description": "Get list of all accounts"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Accounts (CSV)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "CSV file with columns: Platform, Handle, Organization"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/accounts/upload",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "accounts", "upload"]
+            },
+            "description": "Upload accounts from CSV file (Admin/Editor only)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "item": [
+        {
+          "name": "Run Scraper",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"simulated\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/jobs/run-scraper",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "jobs", "run-scraper"]
+            },
+            "description": "Run scraper to collect metrics (Admin/Editor only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Job Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/jobs/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "jobs", "status"]
+            },
+            "description": "Get job status information"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get Admin Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/admin/info",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "admin", "info"]
+            },
+            "description": "Get administrative information (Admin only)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
+

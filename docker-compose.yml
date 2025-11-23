@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: social-media-scraper-app
+    ports:
+      - "${APP_PORT:-5000}:5000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/social_media.db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - SECRET_KEY=${SECRET_KEY}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - FLASK_ENV=${FLASK_ENV:-production}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: social-media-scraper-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery-worker:
+    build: .
+    container_name: social-media-scraper-celery-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/social_media.db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - app
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  celery-beat:
+    build: .
+    container_name: social-media-scraper-celery-beat
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/social_media.db}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - app
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge
+
