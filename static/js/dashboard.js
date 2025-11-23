@@ -193,6 +193,24 @@ async function refreshData(silent = false) {
     }
 }
 
+function updateHeaderStats(accounts) {
+    const totalAccountsEl = document.getElementById('totalAccounts');
+    const totalFollowersEl = document.getElementById('totalFollowers');
+    
+    if (totalAccountsEl && accounts) {
+        totalAccountsEl.textContent = accounts.length.toLocaleString();
+    }
+    
+    if (totalFollowersEl && accounts) {
+        const total = accounts.reduce((sum, acc) => sum + (acc.followers || 0), 0);
+        totalFollowersEl.textContent = total > 1000000 
+            ? (total / 1000000).toFixed(1) + 'M'
+            : total > 1000 
+            ? (total / 1000).toFixed(1) + 'K'
+            : total.toLocaleString();
+    }
+}
+
 function updateRefreshIndicator() {
     const indicator = document.getElementById('lastRefresh');
     if (!indicator) return;
@@ -365,6 +383,9 @@ async function loadAccounts() {
         // Store all accounts for filtering
         allAccounts = data.sort((a, b) => (b.followers || 0) - (a.followers || 0));
         
+        // Update header stats
+        updateHeaderStats(allAccounts);
+        
         // Render accounts
         renderAccounts(allAccounts);
 
@@ -408,17 +429,39 @@ function renderAccounts(accounts) {
         div.id = `acc-${index}`;
         div.setAttribute('data-handle', (acc.handle || '').toLowerCase());
         div.setAttribute('data-platform', (acc.platform || '').toLowerCase());
+        div.setAttribute('tabindex', '0');
+        div.setAttribute('role', 'button');
+        div.setAttribute('aria-label', `Account ${acc.handle} on ${acc.platform}`);
+        
+        const platform = (acc.platform || '').toLowerCase();
+        const platformBadge = `<span class="platform-badge ${platform}">${platform.charAt(0).toUpperCase() + platform.slice(1)}</span>`;
+        
         div.innerHTML = `
-            <span class="account-handle">${acc.handle || 'N/A'}</span>
-            <span class="account-meta">${acc.platform || 'N/A'} • ${(acc.followers || 0).toLocaleString()} followers</span>
+            <span class="account-handle">${platformBadge}${acc.handle || 'N/A'}</span>
+            <span class="account-meta">${(acc.followers || 0).toLocaleString()} followers • ${(acc.engagement || 0).toLocaleString()} engagement</span>
         `;
+        
         div.onclick = () => {
             document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
             div.classList.add('active');
             loadHistory(acc.platform, acc.handle);
         };
+        
+        // Keyboard support
+        div.onkeydown = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                div.click();
+            }
+        };
+        
         list.appendChild(div);
     });
+    
+    // Re-initialize UI enhancements for new accounts
+    if (window.UIEnhancements) {
+        window.UIEnhancements.addPlatformBadges();
+    }
 
     // Show no results message if filtered
     if (accounts.length === 0 && allAccounts.length > 0) {

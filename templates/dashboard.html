@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <link rel="stylesheet" href="/static/css/dashboard-enhancements.css">
     <link rel="stylesheet" href="/static/css/dashboard-ui-enhancements.css">
+    <link rel="stylesheet" href="/static/css/dashboard-interactive.css">
     <style>
         :root {
             --bg-color: #0f172a;
@@ -309,17 +310,27 @@
 
 <body>
     <header class="header" role="banner">
-        <div>
+        <div style="flex: 1;">
             <h1>HHS Social Media Command Center</h1>
-            <div class="header-meta">
+            <div class="header-meta" style="display: flex; align-items: center; gap: 16px; margin-top: 8px;">
                 <span id="lastRefresh" class="refresh-indicator" aria-live="polite" aria-atomic="true">Never refreshed</span>
                 <button id="refreshBtn" class="btn-icon" onclick="refreshData()" aria-label="Refresh data" title="Refresh data (R)">
                     <span id="refreshIcon" aria-hidden="true">🔄</span>
                 </button>
-                <label class="auto-refresh-toggle" data-tooltip="Automatically refresh data every 5 minutes">
+                <label class="auto-refresh-toggle" data-tooltip="Automatically refresh data every 5 minutes" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                     <input type="checkbox" id="autoRefreshToggle" checked aria-label="Enable auto-refresh">
                     <span>Auto-refresh</span>
                 </label>
+                <div id="headerStats" style="display: flex; gap: 16px; margin-left: auto;">
+                    <div class="stat-item" style="min-width: auto; padding: 8px 16px;">
+                        <div class="stat-value" id="totalAccounts" style="font-size: 18px;">-</div>
+                        <div class="stat-label" style="font-size: 10px;">Accounts</div>
+                    </div>
+                    <div class="stat-item" style="min-width: auto; padding: 8px 16px;">
+                        <div class="stat-value" id="totalFollowers" style="font-size: 18px;">-</div>
+                        <div class="stat-label" style="font-size: 10px;">Followers</div>
+                    </div>
+                </div>
             </div>
         </div>
         <nav style="display: flex; gap: 10px; align-items: center;" role="toolbar" aria-label="Main actions">
@@ -512,6 +523,9 @@
     
     <!-- Progress Bar Component -->
     <script src="/static/js/progress-bar.js" defer></script>
+    
+    <!-- UI Enhancements -->
+    <script src="/static/js/ui-enhancements.js" defer></script>
     
     <!-- Dashboard JavaScript (code split and lazy loaded) -->
     <script src="/static/js/dashboard.js" defer></script>
