@@ -24,7 +24,7 @@ def get_db_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
-def generate_token(user_id: int, role: str, token_type: str = 'access') -> dict:
+def generate_token(user_id: int, role: str, token_type: str = 'access', token_version: int = 1) -> dict:
     """
     Generate JWT token for a user.
     
@@ -32,6 +32,7 @@ def generate_token(user_id: int, role: str, token_type: str = 'access') -> dict:
         user_id: User ID
         role: User role
         token_type: 'access' or 'refresh'
+        token_version: Token version for rotation (incremented on refresh)
     
     Returns:
         Dictionary with token and expiration
@@ -42,6 +43,7 @@ def generate_token(user_id: int, role: str, token_type: str = 'access') -> dict:
         'user_id': user_id,
         'role': role,
         'type': token_type,
+        'version': token_version,  # For token rotation
         'exp': datetime.utcnow() + expires_delta,
         'iat': datetime.utcnow()
     }
@@ -51,7 +53,8 @@ def generate_token(user_id: int, role: str, token_type: str = 'access') -> dict:
     return {
         'token': token,
         'expires_in': int(expires_delta.total_seconds()),
-        'token_type': 'Bearer'
+        'token_type': 'Bearer',
+        'version': token_version
     }
 
 def verify_token(token: str) -> dict:
@@ -99,8 +102,16 @@ def get_current_user():
         
         session = get_db_session()
         user = session.query(User).filter_by(id=user_id, is_active=True).first()
-        session.close()
         
+        if user:
+            # Verify token version matches user's current version
+            token_version = payload.get('version', 1)
+            if token_version < user.token_version:
+                # Token has been rotated, invalid
+                session.close()
+                return None
+        
+        session.close()
         return user
     except (ValueError, IndexError, Exception):
         return None

@@ -1,0 +1,40 @@
+name: Test Reporting
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  test-reporting:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Run tests and generate report
+      run: |
+        pytest --cov=scraper --cov=app --cov-report=html --cov-report=json --cov-report=xml -v
+        python scripts/generate_test_report.py
+    
+    - name: Upload test reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-reports
+        path: |
+          test_report.json
+          coverage.xml
+          htmlcov/
+          .coverage
+

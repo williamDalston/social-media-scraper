@@ -65,6 +65,9 @@ social_media.db
 test_*.db
 *.db-journal
 
+# Docker
+docker-compose.override.yml
+
 # Temporary files
 tmp/
 temp/

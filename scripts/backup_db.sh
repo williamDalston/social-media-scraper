@@ -110,6 +110,44 @@ if [ -f "$BACKUP_FILE" ]; then
     log "Backup size: $BACKUP_SIZE"
 fi
 
+# Verify backup
+log "Verifying backup..."
+if [ -f "$BACKUP_FILE" ]; then
+    BACKUP_SIZE=$(stat -f%z "$BACKUP_FILE" 2>/dev/null || stat -c%s "$BACKUP_FILE" 2>/dev/null || echo "0")
+    if [ "$BACKUP_SIZE" -gt 0 ]; then
+        log "Backup verification passed (size: $(du -h "$BACKUP_FILE" | cut -f1))"
+        
+        # Additional verification for SQLite
+        if [ "$DB_TYPE" = "sqlite" ] || [ "$DB_TYPE" = "sqlite3" ]; then
+            if [[ "$BACKUP_FILE" == *.gz ]]; then
+                # Test decompression
+                if gunzip -t "$BACKUP_FILE" 2>/dev/null; then
+                    log "Backup file integrity verified (gzip)"
+                else
+                    error "Backup file integrity check failed"
+                    exit 1
+                fi
+            else
+                # Test SQLite database
+                if command -v sqlite3 &> /dev/null; then
+                    if sqlite3 "$BACKUP_FILE" "PRAGMA integrity_check;" >/dev/null 2>&1; then
+                        log "SQLite database integrity verified"
+                    else
+                        error "SQLite database integrity check failed"
+                        exit 1
+                    fi
+                fi
+            fi
+        fi
+    else
+        error "Backup file is empty or verification failed"
+        exit 1
+    fi
+else
+    error "Backup file not found: $BACKUP_FILE"
+    exit 1
+fi
+
 # Cleanup old backups
 log "Cleaning up backups older than $RETENTION_DAYS days..."
 if [ "$DB_TYPE" = "sqlite" ] || [ "$DB_TYPE" = "sqlite3" ]; then

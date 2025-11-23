@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "social-media-scraper.fullname" . }}-app
+  labels:
+    {{- include "social-media-scraper.labels" . | nindent 4 }}
+    component: app
+spec:
+  replicas: {{ .Values.replicaCount.app }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "social-media-scraper.selectorLabels" . | nindent 6 }}
+      component: app
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "social-media-scraper.selectorLabels" . | nindent 8 }}
+        component: app
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: app
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: {{ .Values.config.environment | quote }}
+        - name: FLASK_ENV
+          value: {{ .Values.config.flaskEnv | quote }}
+        - name: APP_PORT
+          value: {{ .Values.config.appPort | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.config.logLevel | quote }}
+        - name: DATABASE_URL
+          value: {{ .Values.config.databaseUrl | quote }}
+        - name: REDIS_URL
+          value: {{ .Values.config.redisUrl | quote }}
+        - name: CELERY_BROKER_URL
+          value: {{ .Values.config.celeryBrokerUrl | quote }}
+        - name: CELERY_RESULT_BACKEND
+          value: {{ .Values.config.celeryResultBackend | quote }}
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "social-media-scraper.fullname" . }}-secrets
+              key: secretKey
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "social-media-scraper.fullname" . }}-secrets
+              key: jwtSecretKey
+        {{- if .Values.secrets.sentryDsn }}
+        - name: SENTRY_DSN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "social-media-scraper.fullname" . }}-secrets
+              key: sentryDsn
+        {{- end }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.resources.app | nindent 10 }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+        {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "social-media-scraper.fullname" . }}-data
+      - name: logs
+        emptyDir: {}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

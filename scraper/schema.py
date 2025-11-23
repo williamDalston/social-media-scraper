@@ -96,29 +96,87 @@ class FactSocialPost(Base):
     account = relationship("DimAccount")
 
 # Import Job model to ensure it's included in schema
-def init_db(db_path='social_media.db'):
+def init_db(db_path='social_media.db', enable_profiling: bool = False):
+    """
+    Initialize database with optimized connection pooling.
+    
+    Args:
+        db_path: Database path or connection string
+        enable_profiling: Enable query profiling
+        
+    Returns:
+        SQLAlchemy engine
+    """
+    import os
+    from sqlalchemy.pool import NullPool, QueuePool
+    
     # Import Job model to register it with Base
     from models.job import Job  # noqa: F401
     
-    # Configure connection for SQLite
-    # SQLite doesn't support connection pooling like PostgreSQL/MySQL
-    # Use NullPool for SQLite to avoid connection issues
-    from sqlalchemy.pool import NullPool
-    engine = create_engine(
-        f'sqlite:///{db_path}',
-        poolclass=NullPool,  # Use NullPool for SQLite
-        connect_args={
-            'check_same_thread': False,  # Allow multi-threaded access
-            'timeout': 20  # Connection timeout in seconds
-        },
-        echo=False  # Set to True for SQL query logging in development
-    )
+    # Check if using SQLite or production database
+    is_sqlite = db_path.startswith('sqlite') or (not db_path.startswith('postgresql') and not db_path.startswith('mysql'))
+    
+    if is_sqlite:
+        # SQLite configuration - use NullPool
+        engine = create_engine(
+            f'sqlite:///{db_path}' if not db_path.startswith('sqlite') else db_path,
+            poolclass=NullPool,  # Use NullPool for SQLite
+            connect_args={
+                'check_same_thread': False,  # Allow multi-threaded access
+                'timeout': 20  # Connection timeout in seconds
+            },
+            echo=False  # Set to True for SQL query logging in development
+        )
+    else:
+        # Production database configuration - use QueuePool with optimization
+        from config.performance_tuning import PerformanceTuner
+        tuner = PerformanceTuner()
+        pool_config = tuner.optimize_database_connections()
+        
+        engine = create_engine(
+            db_path,
+            poolclass=QueuePool,
+            **pool_config
+        )
+    
+    # Set up query monitoring if profiling enabled
+    if enable_profiling:
+        try:
+            from config.database_performance import setup_query_monitoring
+            setup_query_monitoring(engine)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not set up database monitoring: {e}")
+    else:
+        # Production database (PostgreSQL/MySQL) - use optimized connection pooling
+        pool_size = int(os.getenv('DB_POOL_SIZE', '5'))
+        max_overflow = int(os.getenv('DB_MAX_OVERFLOW', '10'))
+        pool_timeout = int(os.getenv('DB_POOL_TIMEOUT', '30'))
+        pool_recycle = int(os.getenv('DB_POOL_RECYCLE', '3600'))
+        
+        engine = create_engine(
+            db_path,
+            poolclass=QueuePool,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+            pool_recycle=pool_recycle,  # Recycle connections after 1 hour
+            pool_pre_ping=True,  # Verify connections before using
+            echo=False
+        )
+    
+    # Set up query profiling if enabled
+    if enable_profiling:
+        from scraper.utils.query_profiler import setup_query_listening
+        setup_query_listening(engine)
     
     # Create all tables
     Base.metadata.create_all(engine)
     
-    # Add indexes if they don't exist
-    _ensure_indexes(engine, db_path)
+    # Add indexes if they don't exist (SQLite only)
+    if is_sqlite:
+        _ensure_indexes(engine, db_path)
     
     return engine
 
@@ -137,16 +195,24 @@ def _ensure_indexes(engine, db_path):
         ("CREATE INDEX IF NOT EXISTS ix_dim_account_platform ON dim_account(platform)",),
         ("CREATE INDEX IF NOT EXISTS ix_dim_account_handle ON dim_account(handle)",),
         ("CREATE INDEX IF NOT EXISTS ix_dim_account_platform_handle ON dim_account(platform, handle)",),
+        ("CREATE INDEX IF NOT EXISTS ix_dim_account_org_name ON dim_account(org_name)",),
+        ("CREATE INDEX IF NOT EXISTS ix_dim_account_is_core ON dim_account(is_core_account)",),
+        ("CREATE INDEX IF NOT EXISTS ix_dim_account_platform_core ON dim_account(platform, is_core_account)",),
         
         # FactFollowersSnapshot indexes
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_account_key ON fact_followers_snapshot(account_key)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_snapshot_date ON fact_followers_snapshot(snapshot_date)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_account_date ON fact_followers_snapshot(account_key, snapshot_date)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_date_desc ON fact_followers_snapshot(snapshot_date DESC)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_followers ON fact_followers_snapshot(followers_count)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_engagement ON fact_followers_snapshot(engagements_total)",),
         
         # FactSocialPost indexes (if table exists)
         ("CREATE INDEX IF NOT EXISTS ix_fact_post_account_key ON fact_social_post(account_key)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_post_datetime ON fact_social_post(post_datetime_utc)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_post_account_datetime ON fact_social_post(account_key, post_datetime_utc)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_post_platform ON fact_social_post(platform)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_post_datetime_desc ON fact_social_post(post_datetime_utc DESC)",),
         
         # Job table indexes
         ("CREATE INDEX IF NOT EXISTS ix_job_status ON job(status)",),
@@ -156,6 +222,7 @@ def _ensure_indexes(engine, db_path):
         ("CREATE INDEX IF NOT EXISTS ix_job_platform ON job(platform)",),
         ("CREATE INDEX IF NOT EXISTS ix_job_status_created ON job(status, created_at)",),
         ("CREATE INDEX IF NOT EXISTS ix_job_type_status ON job(job_type, status)",),
+        ("CREATE INDEX IF NOT EXISTS ix_job_created_desc ON job(created_at DESC)",),
     ]
     
     for index_sql, in indexes:

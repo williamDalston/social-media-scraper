@@ -19,14 +19,22 @@ class Job(Base):
     error_message = Column(Text)  # Error message if failed
     account_key = Column(Integer, index=True)  # Associated account if applicable
     platform = Column(String, index=True)  # Platform if applicable
+    priority = Column(Integer, default=5)  # Job priority (0-9, higher is more priority)
+    depends_on_job_id = Column(String)  # Job ID this job depends on
+    scheduled_for = Column(DateTime)  # When job should run (for scheduling)
+    paused = Column(String, default='false')  # Whether job is paused
+    sla_seconds = Column(Integer)  # SLA in seconds
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
+    duration_seconds = Column(Float)  # Actual duration in seconds
     
     # Composite indexes for common queries
     __table_args__ = (
         Index('ix_job_status_created', 'status', 'created_at'),
         Index('ix_job_type_status', 'job_type', 'status'),
+        Index('ix_job_priority_status', 'priority', 'status'),
+        Index('ix_job_scheduled_for', 'scheduled_for'),
     )
     
     def __repr__(self):
@@ -51,6 +59,12 @@ class Job(Base):
             'error_message': self.error_message,
             'account_key': self.account_key,
             'platform': self.platform,
+            'priority': self.priority,
+            'depends_on_job_id': self.depends_on_job_id,
+            'scheduled_for': self.scheduled_for.isoformat() if self.scheduled_for else None,
+            'paused': self.paused == 'true',
+            'sla_seconds': self.sla_seconds,
+            'duration_seconds': self.duration_seconds,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'started_at': self.started_at.isoformat() if self.started_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None,

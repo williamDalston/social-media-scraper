@@ -23,6 +23,25 @@ class Config:
     # Database
     DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///social_media.db')
     
+    @classmethod
+    def get_db_path(cls) -> Optional[str]:
+        """
+        Extract SQLite database file path from DATABASE_URL.
+        Returns None if not SQLite or if path cannot be extracted.
+        """
+        try:
+            parsed = urlparse(cls.DATABASE_URL)
+            if parsed.scheme == 'sqlite':
+                # SQLite URLs can be: sqlite:///path or sqlite:///absolute/path
+                path = parsed.path
+                if path.startswith('/'):
+                    return path
+                # Handle relative paths
+                return path.lstrip('/')
+            return None
+        except Exception:
+            return None
+    
     # Redis
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     REDIS_PORT: int = int(os.getenv('REDIS_PORT', '6379'))

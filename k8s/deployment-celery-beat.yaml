@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social-media-scraper-celery-beat
+  namespace: social-media-scraper
+  labels:
+    app: social-media-scraper
+    component: celery-beat
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: social-media-scraper
+      component: celery-beat
+  template:
+    metadata:
+      labels:
+        app: social-media-scraper
+        component: celery-beat
+    spec:
+      containers:
+      - name: celery-beat
+        image: social-media-scraper:latest
+        imagePullPolicy: Always
+        command: ["celery", "-A", "celery_app", "beat", "--loglevel=info"]
+        envFrom:
+        - configMapRef:
+            name: social-media-scraper-config
+        - secretRef:
+            name: social-media-scraper-secrets
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: social-media-scraper-data
+      - name: logs
+        emptyDir: {}
+      restartPolicy: Always
+

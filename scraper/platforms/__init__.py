@@ -10,6 +10,7 @@ from .linkedin_scraper import LinkedInScraper
 from .youtube_scraper import YouTubeScraper
 from .truth_scraper import TruthScraper
 from .tiktok_scraper import TikTokScraper
+from .reddit_scraper import RedditScraper
 
 __all__ = [
     'BasePlatformScraper',
@@ -20,5 +21,6 @@ __all__ = [
     'YouTubeScraper',
     'TruthScraper',
     'TikTokScraper',
+    'RedditScraper',
 ]
 

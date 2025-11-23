@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "social-media-scraper.fullname" . }}-config
+  labels:
+    {{- include "social-media-scraper.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.config.environment | quote }}
+  FLASK_ENV: {{ .Values.config.flaskEnv | quote }}
+  APP_PORT: {{ .Values.config.appPort | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  DATABASE_URL: {{ .Values.config.databaseUrl | quote }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
+  CELERY_BROKER_URL: {{ .Values.config.celeryBrokerUrl | quote }}
+  CELERY_RESULT_BACKEND: {{ .Values.config.celeryResultBackend | quote }}
+

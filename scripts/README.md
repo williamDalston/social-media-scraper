@@ -73,6 +73,36 @@ Service management script for starting, stopping, restarting, and checking statu
 - systemd services
 - Manual process management
 
+### `init_db.sh`
+Database initialization script that creates the database, runs migrations, and optionally creates an initial admin user.
+
+**Usage:**
+```bash
+./scripts/init_db.sh
+```
+
+**Features:**
+- Creates database directory if needed
+- Runs all pending migrations
+- Optionally creates admin user (set CREATE_ADMIN=true in .env)
+
+### `migrate.sh`
+Convenient wrapper for Alembic migration commands.
+
+**Usage:**
+```bash
+./scripts/migrate.sh {upgrade|downgrade|create|history|current|show|stamp} [args]
+```
+
+**Examples:**
+```bash
+./scripts/migrate.sh upgrade              # Upgrade to latest
+./scripts/migrate.sh downgrade -1         # Downgrade by one
+./scripts/migrate.sh create "add column" # Create new migration
+./scripts/migrate.sh history              # Show migration history
+./scripts/migrate.sh current              # Show current version
+```
+
 ## Permissions
 
 All scripts are executable. If you encounter permission errors:

@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install dependencies
+# Copy requirements first for better layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
@@ -25,8 +25,12 @@ RUN useradd -m -u 1000 appuser && \
 # Copy installed packages from builder
 COPY --from=builder /root/.local /home/appuser/.local
 
-# Copy application code
+# Copy application code (this layer changes most frequently)
 COPY --chown=appuser:appuser . .
+
+# Ensure data and logs directories exist with correct permissions
+RUN mkdir -p /app/data /app/logs && \
+    chown -R appuser:appuser /app/data /app/logs
 
 # Set environment variables
 ENV PATH=/home/appuser/.local/bin:$PATH \

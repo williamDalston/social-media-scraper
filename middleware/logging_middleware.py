@@ -1,6 +1,7 @@
 """
 Logging middleware for Flask application.
 Logs all HTTP requests and responses with structured data.
+Includes correlation ID support for distributed tracing.
 """
 import time
 import logging
@@ -17,6 +18,18 @@ except ImportError:
     METRICS_AVAILABLE = False
     record_request = None
 
+# Try to import correlation ID utilities
+try:
+    from config.tracing_config import generate_correlation_id, get_correlation_id
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+    def generate_correlation_id():
+        import uuid
+        return str(uuid.uuid4())
+    def get_correlation_id():
+        return None
+
 
 def setup_request_logging(app):
     """
@@ -30,6 +43,13 @@ def setup_request_logging(app):
         """Log incoming request information."""
         g.start_time = time.time()
         
+        # Generate or get correlation ID
+        correlation_id = request.headers.get('X-Correlation-ID') or generate_correlation_id()
+        g.correlation_id = correlation_id
+        
+        # Try to get trace ID from OpenTelemetry if available
+        trace_id = get_correlation_id() if TRACING_AVAILABLE else None
+        
         # Log request details
         logger.info(
             "Incoming request",
@@ -40,6 +60,8 @@ def setup_request_logging(app):
                 'user_agent': request.headers.get('User-Agent'),
                 'content_type': request.content_type,
                 'content_length': request.content_length,
+                'correlation_id': correlation_id,
+                'trace_id': trace_id,
             }
         )
     
@@ -61,6 +83,11 @@ def setup_request_logging(app):
         
         duration_seconds = duration_ms / 1000.0
         
+        # Add correlation ID to response headers
+        correlation_id = getattr(g, 'correlation_id', None)
+        if correlation_id:
+            response.headers['X-Correlation-ID'] = correlation_id
+        
         logger.log(
             log_level,
             "Request completed",
@@ -73,6 +100,7 @@ def setup_request_logging(app):
                 'response_size': response.content_length,
                 'user_id': user_id,
                 'remote_addr': request.remote_addr,
+                'correlation_id': correlation_id,
             }
         )
         

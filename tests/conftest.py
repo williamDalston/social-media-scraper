@@ -154,3 +154,21 @@ def multiple_accounts(db_session):
         db_session.refresh(account)
     return accounts
 
+
+# E2E test fixtures
+@pytest.fixture(scope="session")
+def live_server(app):
+    """Create a live server for E2E tests."""
+    from flask import Flask
+    from werkzeug.serving import make_server
+    import threading
+    
+    server = make_server('127.0.0.1', 0, app)
+    server_thread = threading.Thread(target=server.serve_forever)
+    server_thread.daemon = True
+    server_thread.start()
+    
+    yield server
+    
+    server.shutdown()
+

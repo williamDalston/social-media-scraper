@@ -318,6 +318,62 @@ class JobStats(Resource):
             session.close()
 
 
+@ns.route('/<job_id>/pause')
+@ns.doc(security='Bearer Auth')
+@ns.param('job_id', 'Job ID (Celery task ID)')
+class PauseJob(Resource):
+    """Pause a pending job."""
+    
+    @ns.doc('pause_job')
+    @ns.marshal_with(job_model)
+    @ns.response(200, 'Success')
+    @ns.response(400, 'Bad Request', error_model)
+    @ns.response(404, 'Job not found', error_model)
+    @ns.response(401, 'Unauthorized', error_model)
+    @require_any_role(['Admin', 'Editor'])
+    def post(self, job_id):
+        """Pause a pending job."""
+        from tasks.job_management import pause_job
+        
+        if pause_job(job_id):
+            session = get_db_session()
+            try:
+                job = session.query(Job).filter_by(job_id=job_id).first()
+                return job.to_dict()
+            finally:
+                session.close()
+        else:
+            raise BadRequestError('Job cannot be paused (must be pending)')
+
+
+@ns.route('/<job_id>/resume')
+@ns.doc(security='Bearer Auth')
+@ns.param('job_id', 'Job ID (Celery task ID)')
+class ResumeJob(Resource):
+    """Resume a paused job."""
+    
+    @ns.doc('resume_job')
+    @ns.marshal_with(job_model)
+    @ns.response(200, 'Success')
+    @ns.response(400, 'Bad Request', error_model)
+    @ns.response(404, 'Job not found', error_model)
+    @ns.response(401, 'Unauthorized', error_model)
+    @require_any_role(['Admin', 'Editor'])
+    def post(self, job_id):
+        """Resume a paused job."""
+        from tasks.job_management import resume_job
+        
+        if resume_job(job_id):
+            session = get_db_session()
+            try:
+                job = session.query(Job).filter_by(job_id=job_id).first()
+                return job.to_dict()
+            finally:
+                session.close()
+        else:
+            raise BadRequestError('Job cannot be resumed (must be paused and pending)')
+
+
 @ns.route('/<job_id>/cancel')
 @ns.doc(security='Bearer Auth')
 @ns.param('job_id', 'Job ID (Celery task ID)')

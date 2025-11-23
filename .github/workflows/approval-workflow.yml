@@ -1,0 +1,56 @@
+name: Deployment Approval Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+
+jobs:
+  request-approval:
+    name: Request Approval
+    runs-on: ubuntu-latest
+    steps:
+      - name: Request approval for production
+        if: github.event.inputs.environment == 'production'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.TOKEN }}
+          approvers: admin-user,devops-lead
+          minimum-approvals: 2
+          issue-title: 'Deployment Approval Required'
+          issue-body: |
+            **Deployment Request**
+            
+            Environment: ${{ github.event.inputs.environment }}
+            Version: ${{ github.event.inputs.version }}
+            Requested by: ${{ github.actor }}
+            
+            Please review and approve this deployment.
+          allowed-list: admin-user,devops-lead,engineering-manager
+
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: request-approval
+    if: success()
+    environment:
+      name: ${{ github.event.inputs.environment }}
+      url: https://api-${{ github.event.inputs.environment }}.example.com
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to ${{ github.event.inputs.environment }}
+        run: |
+          echo "Deploying version ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}"
+          # Add actual deployment commands here
+

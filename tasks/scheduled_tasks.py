@@ -45,6 +45,31 @@ def daily_scrape_all():
         }
 
 @celery_app.task
+def archive_old_job_results():
+    """
+    Archive old job results to reduce database size.
+    Runs monthly.
+    """
+    try:
+        logger.info("Starting archive_old_job_results scheduled task")
+        from tasks.job_optimization import archive_old_job_results
+        archived_count = archive_old_job_results(days=90)
+        
+        return {
+            'status': 'completed',
+            'archived_count': archived_count,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error in archive_old_job_results task: {e}", exc_info=True)
+        return {
+            'status': 'failed',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+
+@celery_app.task
 def cleanup_old_jobs():
     """
     Cleanup old completed/failed jobs older than 30 days.
@@ -96,6 +121,64 @@ def cleanup_old_jobs():
     finally:
         if session:
             session.close()
+
+@celery_app.task
+def check_conditional_jobs():
+    """
+    Check conditional jobs and start them if conditions are met.
+    Runs periodically.
+    """
+    try:
+        from tasks.scheduling import get_due_scheduled_jobs
+        from tasks.job_management import check_job_dependencies
+        
+        session = get_db_session()
+        try:
+            conditional_jobs = session.query(Job).filter(
+                Job.status == 'conditional',
+                Job.paused == 'false'
+            ).all()
+            
+            for job in conditional_jobs:
+                # Check if dependencies are met (if any)
+                if job.depends_on_job_id:
+                    satisfied, _ = check_job_dependencies(job.job_id)
+                    if not satisfied:
+                        continue
+                
+                # For now, we'll implement simple conditions
+                # In production, you'd evaluate the condition_func
+                import json
+                task_info = json.loads(job.result) if job.result else {}
+                condition_type = task_info.get('condition_type')
+                
+                # Example: condition based on queue depth
+                if condition_type == 'queue_empty':
+                    from tasks.job_management import get_queue_depth
+                    if get_queue_depth() == 0:
+                        # Condition met, start job
+                        task_name = task_info.get('task_name')
+                        task_kwargs = task_info.get('task_kwargs', {})
+                        # Start the job...
+                        pass
+        finally:
+            session.close()
+    except Exception as e:
+        logger.error(f"Error checking conditional jobs: {e}")
+
+
+@celery_app.task
+def process_scheduled_jobs():
+    """
+    Process all scheduled jobs that are due.
+    Runs every minute.
+    """
+    try:
+        from tasks.scheduling import process_due_scheduled_jobs
+        process_due_scheduled_jobs()
+    except Exception as e:
+        logger.error(f"Error processing scheduled jobs: {e}")
+
 
 @celery_app.task
 def health_check():

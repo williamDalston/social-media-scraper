@@ -1,0 +1,17 @@
+apiVersion: v2
+name: social-media-scraper
+description: A Helm chart for Social Media Scraper application
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - social-media
+  - scraper
+  - flask
+  - celery
+maintainers:
+  - name: DevOps Team
+home: https://github.com/your-org/social-media-scraper
+sources:
+  - https://github.com/your-org/social-media-scraper
+

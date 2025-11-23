@@ -14,13 +14,40 @@ import csv
 import time
 import functools
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 
 # Import auth modules
 from auth.routes import auth_bp
 from auth.decorators import require_auth, require_any_role
 from auth.validators import validate_csv_file, sanitize_string
+from auth.audit import log_security_event, AuditEventType, get_audit_logs
+from auth.api_keys import create_api_key, revoke_api_key
+from auth.ip_filter import add_ip_to_whitelist, add_ip_to_blacklist
 from middleware.security import setup_security_headers
+
+# Try to import optional OAuth and MFA modules
+try:
+    from auth.oauth import oauth_bp, init_oauth
+    OAUTH_AVAILABLE = True
+except ImportError:
+    OAUTH_AVAILABLE = False
+    oauth_bp = None
+    init_oauth = lambda x: None
+
+try:
+    from auth.mfa import mfa_bp
+    MFA_AVAILABLE = True
+except ImportError:
+    MFA_AVAILABLE = False
+    mfa_bp = None
+
+try:
+    from auth.password_reset import password_reset_bp
+    PASSWORD_RESET_AVAILABLE = True
+except ImportError:
+    PASSWORD_RESET_AVAILABLE = False
+    password_reset_bp = None
 
 load_dotenv()
 
@@ -46,8 +73,75 @@ limiter = Limiter(
 # Security Headers
 setup_security_headers(app)
 
-# Register auth blueprint
+# Security Middleware (bot detection, fraud detection, policy enforcement)
+try:
+    from middleware.security_middleware import setup_security_middleware
+    setup_security_middleware(app)
+except ImportError:
+    pass  # Security middleware is optional
+
+# Security Middleware (bot detection, fraud detection)
+try:
+    from middleware.security_middleware import setup_security_middleware
+    setup_security_middleware(app)
+except ImportError:
+    pass
+
+# Production Security Hardening
+try:
+    from security.production_hardening import setup_production_security
+    setup_production_security(app)
+except ImportError:
+    pass  # Security middleware is optional
+
+# Register honeypot blueprint
+try:
+    from security.honeypot import honeypot_bp
+    app.register_blueprint(honeypot_bp)
+except ImportError:
+    pass  # Honeypot is optional
+
+# Register auth blueprints
 app.register_blueprint(auth_bp)
+if OAUTH_AVAILABLE and oauth_bp:
+    app.register_blueprint(oauth_bp)
+    init_oauth(app)
+if MFA_AVAILABLE and mfa_bp:
+    app.register_blueprint(mfa_bp)
+
+# Register log viewer blueprint
+try:
+    from api.log_viewer import log_viewer_bp
+    app.register_blueprint(log_viewer_bp)
+except ImportError:
+    pass  # Log viewer is optional
+if PASSWORD_RESET_AVAILABLE and password_reset_bp:
+    app.register_blueprint(password_reset_bp)
+
+# Register Phase 3 observability blueprints
+try:
+    from api.production_monitoring import production_bp
+    app.register_blueprint(production_bp)
+except ImportError:
+    pass
+
+try:
+    from api.analytics import analytics_bp
+    app.register_blueprint(analytics_bp)
+except ImportError:
+    pass
+
+try:
+    from api.insights import insights_bp
+    app.register_blueprint(insights_bp)
+except ImportError:
+    pass
+
+try:
+    from api.incidents import incidents_bp
+    app.register_blueprint(incidents_bp)
+except ImportError:
+    pass
 
 # Apply rate limiting to auth routes after blueprint registration
 # Login endpoint: 5 requests per minute per IP
@@ -85,6 +179,22 @@ def track_performance(endpoint_name=None):
                 duration = time.time() - start_time
                 metrics = get_metrics()
                 metrics.record_api_request(endpoint, duration, error)
+                
+                # Record for SLA tracking
+                try:
+                    from config.production_performance import record_performance_metric
+                    record_performance_metric('api_response', duration)
+                    
+                    # Check alerts
+                    from config.performance_alerting import check_performance_alerts
+                    alerts = check_performance_alerts('api_response', duration)
+                    if alerts:
+                        logger.warning(
+                            f"Performance alerts for {endpoint}: {alerts}",
+                            extra={'endpoint': endpoint, 'duration': duration, 'alerts': alerts}
+                        )
+                except Exception as e:
+                    logger.debug(f"Performance tracking error: {e}")
         return wrapper
     return decorator
 
@@ -106,6 +216,18 @@ def index():
 @track_performance('api_summary')
 def api_summary():
     """Get summary of all accounts with latest metrics. Cached for 5 minutes."""
+    # Log data access
+    user = getattr(request, 'current_user', None)
+    if user:
+        log_security_event(
+            AuditEventType.DATA_ACCESS,
+            user_id=user.id,
+            username=user.username,
+            resource_type='summary',
+            action='view',
+            success=True
+        )
+    
     session = get_db_session()
     try:
         # Get latest snapshot date - optimized query
@@ -304,6 +426,8 @@ def api_grid():
 @track_performance('api_upload')
 def upload_csv():
     """Upload CSV file to add accounts. Invalidates cache on success."""
+    user = getattr(request, 'current_user', None)
+    
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
     
@@ -359,6 +483,18 @@ def upload_csv():
         invalidate_grid_cache()
         invalidate_accounts_list_cache()
         
+        # Log file upload
+        if user:
+            log_security_event(
+                AuditEventType.FILE_UPLOAD,
+                user_id=user.id,
+                username=user.username,
+                resource_type='csv',
+                action='upload',
+                details={'accounts_added': count},
+                success=True
+            )
+        
         return jsonify({'message': f'Successfully added {count} accounts'})
     finally:
         session.close()
@@ -370,6 +506,8 @@ def upload_csv():
 @track_performance('api_run_scraper')
 def run_scraper():
     """Run scraper. Invalidates cache on completion."""
+    user = getattr(request, 'current_user', None)
+    
     if not request.is_json:
         return jsonify({'error': 'Content-Type must be application/json'}), 400
     
@@ -390,6 +528,18 @@ def run_scraper():
         metrics = get_metrics()
         metrics.record_scraper_execution(elapsed_time, success=True)
         
+        # Log scraper run
+        if user:
+            log_security_event(
+                AuditEventType.SCRAPER_RUN,
+                user_id=user.id,
+                username=user.username,
+                resource_type='scraper',
+                action='run',
+                details={'mode': mode, 'execution_time': elapsed_time},
+                success=True
+            )
+        
         # Invalidate all caches after scraping
         invalidate_summary_cache()
         invalidate_grid_cache()
@@ -402,6 +552,20 @@ def run_scraper():
     except Exception as e:
         metrics = get_metrics()
         metrics.record_scraper_execution(0, success=False)
+        
+        # Log failed scraper run
+        if user:
+            log_security_event(
+                AuditEventType.SCRAPER_RUN,
+                user_id=user.id,
+                username=user.username,
+                resource_type='scraper',
+                action='run',
+                details={'mode': mode},
+                success=False,
+                error_message=str(e)
+            )
+        
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/accounts')
@@ -460,9 +624,454 @@ def api_performance():
     """Get performance metrics."""
     try:
         metrics = get_metrics()
-        return jsonify(metrics.get_all_stats())
+        stats = metrics.get_all_stats()
+        
+        # Add SLA status
+        try:
+            from config.production_performance import get_performance_summary, get_sla_status
+            stats['sla_summary'] = get_performance_summary()
+            stats['sla_status'] = get_sla_status()
+        except Exception as e:
+            logger.debug(f"Could not load SLA data: {e}")
+            stats['sla_summary'] = {'error': 'SLA tracking not available'}
+        
+        # Add alert summary
+        try:
+            from config.performance_alerting import get_alert_summary
+            stats['alerts'] = get_alert_summary()
+        except Exception as e:
+            logger.debug(f"Could not load alert data: {e}")
+            stats['alerts'] = {'error': 'Alert tracking not available'}
+        
+        return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/sla')
+@require_auth
+def api_performance_sla():
+    """Get SLA status."""
+    try:
+        from config.production_performance import get_sla_status, get_performance_summary
+        return jsonify({
+            'summary': get_performance_summary(),
+            'slas': get_sla_status()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/alerts')
+@require_auth
+def api_performance_alerts():
+    """Get performance alerts."""
+    try:
+        from config.performance_alerting import (
+            get_alert_summary, get_alert_history, get_alert_manager
+        )
+        from config.performance_alerting import AlertSeverity
+        
+        return jsonify({
+            'summary': get_alert_summary(),
+            'active_alerts': get_alert_manager().get_active_alerts(),
+            'recent_history': get_alert_history(limit=50),
+            'critical_alerts': get_alert_history(limit=20, severity=AlertSeverity.CRITICAL)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/recommendations')
+@require_auth
+def api_performance_recommendations():
+    """Get performance optimization recommendations."""
+    try:
+        from config.performance_tuning import PerformanceTuner
+        from cache.metrics import get_metrics
+        
+        metrics = get_metrics()
+        stats = metrics.get_all_stats()
+        
+        tuner = PerformanceTuner()
+        recommendations = tuner.get_performance_recommendations(stats)
+        
+        return jsonify({
+            'recommendations': recommendations,
+            'count': len(recommendations),
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/tuning')
+@require_auth
+@require_any_role(['admin'])
+def api_performance_tuning():
+    """Get performance tuning configuration."""
+    try:
+        from config.performance_tuning import get_performance_tuning_config
+        return jsonify(get_performance_tuning_config())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/cache')
+@require_auth
+def api_cache_performance():
+    """Get cache performance statistics."""
+    try:
+        from cache.production_monitoring import (
+            get_cache_performance_stats,
+            get_cache_recommendations,
+            get_cache_monitor
+        )
+        
+        monitor = get_cache_monitor()
+        stats = monitor.get_overall_stats()
+        recommendations = monitor.get_recommendations()
+        key_stats = monitor.get_key_stats(limit=20)
+        recent_errors = monitor.get_recent_errors(limit=20)
+        trends = monitor.get_trends(hours=24)
+        
+        return jsonify({
+            'stats': stats,
+            'recommendations': recommendations,
+            'top_keys': key_stats,
+            'recent_errors': recent_errors,
+            'trends': trends,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.exception("Failed to get cache performance stats")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/database')
+@require_auth
+def api_database_performance():
+    """Get database performance statistics."""
+    try:
+        from config.database_performance import (
+            get_db_performance_stats,
+            get_db_recommendations,
+            get_db_monitor
+        )
+        
+        monitor = get_db_monitor()
+        stats = monitor.get_overall_stats()
+        recommendations = monitor.get_recommendations()
+        slow_queries = monitor.get_slow_queries(limit=20)
+        query_patterns = monitor.get_query_patterns(limit=20)
+        recent_errors = monitor.get_recent_errors(limit=20)
+        trends = monitor.get_trends(hours=24)
+        
+        return jsonify({
+            'stats': stats,
+            'recommendations': recommendations,
+            'slow_queries': slow_queries,
+            'query_patterns': query_patterns,
+            'recent_errors': recent_errors,
+            'trends': trends,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.exception("Failed to get database performance stats")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/performance/frontend', methods=['POST'])
+def api_frontend_performance():
+    """Receive frontend performance metrics."""
+    try:
+        data = request.get_json()
+        # Store metrics (could be persisted to database or metrics system)
+        logger.info("Frontend performance metrics received", extra=data)
+        return jsonify({'status': 'received'}), 200
+    except Exception as e:
+        logger.exception("Failed to receive frontend metrics")
+        return jsonify({'error': str(e)}), 500
+
+# Admin dashboard route
+@app.route('/admin')
+@require_any_role(['Admin', 'Viewer'])
+def admin_dashboard():
+    """Admin monitoring dashboard."""
+    return render_template('admin_dashboard.html')
+
+# Admin status endpoint
+@app.route('/api/admin/status')
+@require_any_role(['Admin', 'Viewer'])
+def admin_status():
+    """Get comprehensive admin status for dashboard."""
+    try:
+        from config.health_checks import run_all_health_checks
+        from config.business_metrics import get_business_metrics_summary
+        from config.slo_sla_tracking import get_slo_status
+        from config.anomaly_detection import anomaly_detector
+        from config.incident_management import incident_manager
+        from config.usage_analytics import usage_analytics
+        from config.data_insights import insights_engine
+        from config.performance_benchmarking import performance_benchmarker
+        from config.metrics_config import (
+            http_requests_total, scraper_runs_total,
+            active_jobs, accounts_total
+        )
+        from sqlalchemy.orm import sessionmaker
+        from scraper.schema import DimAccount, FactFollowersSnapshot, init_db
+        import psutil
+        import os
+        
+        # System health
+        health_checks = run_all_health_checks(db_path)
+        
+        # Business metrics
+        business_metrics = get_business_metrics_summary()
+        
+        # SLO status
+        try:
+            slo_status = get_slo_status()
+        except Exception:
+            slo_status = {}
+        
+        # Recent anomalies
+        try:
+            recent_anomalies = anomaly_detector.get_recent_anomalies(hours=24)
+        except Exception:
+            recent_anomalies = []
+        
+        # Open incidents
+        try:
+            open_incidents = incident_manager.get_open_incidents()
+        except Exception:
+            open_incidents = []
+        
+        # Usage analytics
+        try:
+            usage_summary = usage_analytics.get_usage_summary(hours=24)
+        except Exception:
+            usage_summary = {}
+        
+        # Recent insights
+        try:
+            recent_insights = insights_engine.get_recent_insights(hours=24)
+        except Exception:
+            recent_insights = []
+        
+        # Performance benchmarks
+        try:
+            benchmarks = performance_benchmarker.get_benchmark_summary()
+        except Exception:
+            benchmarks = {}
+        
+        # Database stats
+        engine = init_db(db_path)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        try:
+            total_accounts = session.query(func.count(DimAccount.account_key)).scalar() or 0
+            total_snapshots = session.query(func.count(FactFollowersSnapshot.snapshot_key)).scalar() or 0
+            latest_snapshot = session.query(func.max(FactFollowersSnapshot.snapshot_date)).scalar()
+        finally:
+            session.close()
+        
+        # System resources
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        
+        return jsonify({
+            'system': {
+                'health': {
+                    name: {
+                        'status': result.status,
+                        'message': result.message
+                    }
+                    for name, result in health_checks.items()
+                },
+                'resources': {
+                    'cpu_percent': cpu_percent,
+                    'memory': {
+                        'total_mb': memory.total / (1024 * 1024),
+                        'used_mb': memory.used / (1024 * 1024),
+                        'percent': memory.percent
+                    },
+                    'disk': {
+                        'total_gb': disk.total / (1024 * 1024 * 1024),
+                        'used_gb': disk.used / (1024 * 1024 * 1024),
+                        'percent': (disk.used / disk.total * 100) if disk.total > 0 else 0
+                    }
+                }
+            },
+            'business': {
+                'metrics': business_metrics,
+                'database': {
+                    'total_accounts': total_accounts,
+                    'total_snapshots': total_snapshots,
+                    'latest_snapshot': latest_snapshot.isoformat() if latest_snapshot else None
+                }
+            },
+            'observability': {
+                'slo_status': slo_status,
+                'anomalies': {
+                    'recent_count': len(recent_anomalies),
+                    'critical_count': len([a for a in recent_anomalies if a.severity == 'critical']),
+                    'recent': [
+                        {
+                            'metric_name': a.metric_name,
+                            'severity': a.severity,
+                            'value': a.value,
+                            'timestamp': a.timestamp.isoformat()
+                        }
+                        for a in recent_anomalies[:10]
+                    ]
+                },
+                'incidents': {
+                    'open_count': len(open_incidents),
+                    'critical_count': len([i for i in open_incidents if i.severity.value == 'critical']),
+                    'open': [
+                        {
+                            'incident_id': i.incident_id,
+                            'title': i.title,
+                            'severity': i.severity.value,
+                            'status': i.status.value,
+                            'created_at': i.created_at.isoformat()
+                        }
+                        for i in open_incidents[:10]
+                    ]
+                },
+                'insights': {
+                    'recent_count': len(recent_insights),
+                    'recent': [
+                        {
+                            'insight_id': i.insight_id,
+                            'category': i.category,
+                            'title': i.title,
+                            'severity': i.severity,
+                            'recommendation': i.recommendation
+                        }
+                        for i in recent_insights[:10]
+                    ]
+                },
+                'benchmarks': benchmarks
+            },
+            'usage': usage_summary,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.exception("Failed to get admin status")
+        return jsonify({'error': str(e)}), 500
+
+# Health check endpoints
+@app.route('/health')
+def health():
+    """Comprehensive health check endpoint."""
+    try:
+        from config.health_checks import run_health_checks, get_overall_health
+        
+        results = run_health_checks(db_path=db_path, include_optional=True, use_cache=True)
+        overall_status = get_overall_health(results)
+        
+        status_code = 200 if overall_status == 'healthy' else (503 if overall_status == 'unhealthy' else 200)
+        
+        return jsonify({
+            'status': overall_status,
+            'checks': {name: result.to_dict() for name, result in results.items()},
+            'timestamp': datetime.utcnow().isoformat(),
+            'version': os.getenv('RELEASE_VERSION', 'unknown')
+        }), status_code
+    except Exception as e:
+        logger.exception("Health check failed")
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 503
+
+
+@app.route('/health/ready')
+def health_ready():
+    """Readiness probe for Kubernetes."""
+    try:
+        from config.health_checks import check_database
+        
+        result = check_database(db_path)
+        if result.status == 'healthy':
+            return jsonify({'status': 'ready'}), 200
+        else:
+            return jsonify({'status': 'not ready', 'reason': result.message}), 503
+    except Exception as e:
+        logger.error(f"Readiness check failed: {e}")
+        return jsonify({'status': 'not ready', 'error': str(e)}), 503
+
+
+@app.route('/health/live')
+def health_live():
+    """Liveness probe for Kubernetes."""
+    return jsonify({'status': 'alive'}), 200
+
+# Admin endpoints for IP management
+@app.route('/api/admin/ip/whitelist', methods=['POST'])
+@require_any_role(['Admin'])
+@csrf.exempt
+def add_whitelist_ip():
+    """Add IP to whitelist (Admin only)."""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    ip = data.get('ip', '').strip()
+    reason = data.get('reason', '').strip()
+    
+    if not ip:
+        return jsonify({'error': 'IP address is required'}), 400
+    
+    success = add_ip_to_whitelist(ip, reason)
+    
+    if success:
+        user = getattr(request, 'current_user', None)
+        if user:
+            log_security_event(
+                AuditEventType.DATA_MODIFICATION,
+                user_id=user.id,
+                username=user.username,
+                resource_type='ip_filter',
+                action='whitelist_add',
+                details={'ip': ip, 'reason': reason},
+                success=True
+            )
+        return jsonify({'message': f'IP {ip} added to whitelist'}), 200
+    else:
+        return jsonify({'error': 'Invalid IP address or CIDR range'}), 400
+
+@app.route('/api/admin/ip/blacklist', methods=['POST'])
+@require_any_role(['Admin'])
+@csrf.exempt
+def add_blacklist_ip():
+    """Add IP to blacklist (Admin only)."""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    ip = data.get('ip', '').strip()
+    reason = data.get('reason', '').strip()
+    
+    if not ip:
+        return jsonify({'error': 'IP address is required'}), 400
+    
+    success = add_ip_to_blacklist(ip, reason)
+    
+    if success:
+        user = getattr(request, 'current_user', None)
+        if user:
+            log_security_event(
+                AuditEventType.DATA_MODIFICATION,
+                user_id=user.id,
+                username=user.username,
+                resource_type='ip_filter',
+                action='blacklist_add',
+                details={'ip': ip, 'reason': reason},
+                success=True
+            )
+        return jsonify({'message': f'IP {ip} added to blacklist'}), 200
+    else:
+        return jsonify({'error': 'Invalid IP address or CIDR range'}), 400
 
 # Error handlers for security
 @app.errorhandler(429)
@@ -485,5 +1094,34 @@ if __name__ == '__main__':
     # Ensure at least one admin user exists (creates default if none exist)
     from auth.utils import ensure_admin_exists
     ensure_admin_exists()
+    
+    # Initialize distributed tracing with app
+    try:
+        from config.tracing_config import init_tracing
+        init_tracing(app, service_name='hhs-social-media-scraper')
+    except:
+        pass
+    
+    # Set up periodic critical issue checking
+    try:
+        from config.critical_alerting import alert_manager
+        import threading
+        import time
+        
+        def check_critical_issues_periodically():
+            """Background thread to check for critical issues every 5 minutes."""
+            while True:
+                try:
+                    alert_manager.check_all()
+                except Exception as e:
+                    logger.exception("Error checking critical issues")
+                time.sleep(300)  # Check every 5 minutes
+        
+        # Start background thread for critical issue checking
+        check_thread = threading.Thread(target=check_critical_issues_periodically, daemon=True)
+        check_thread.start()
+        logger.info("Critical issue checking thread started")
+    except Exception as e:
+        logger.warning(f"Could not start critical issue checking: {e}")
     
     app.run(debug=True, port=5000)

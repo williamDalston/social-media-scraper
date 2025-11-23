@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social-media-scraper-celery-worker
+  namespace: social-media-scraper
+  labels:
+    app: social-media-scraper
+    component: celery-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: social-media-scraper
+      component: celery-worker
+  template:
+    metadata:
+      labels:
+        app: social-media-scraper
+        component: celery-worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: social-media-scraper:latest
+        imagePullPolicy: Always
+        command: ["celery", "-A", "celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+        envFrom:
+        - configMapRef:
+            name: social-media-scraper-config
+        - secretRef:
+            name: social-media-scraper-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: social-media-scraper-data
+      - name: logs
+        emptyDir: {}
+      restartPolicy: Always
+

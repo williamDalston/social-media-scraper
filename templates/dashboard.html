@@ -5,9 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HHS Social Media Command Center</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/gridjs/dist/gridjs.umd.js"></script>
+    <!-- Lazy loaded via dashboard.js -->
     <link href="https://unpkg.com/gridjs/dist/theme/mermaid.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/css/dashboard.css">
     <style>
         :root {
             --bg-color: #0f172a;
@@ -274,8 +274,20 @@
 
 <body>
     <div class="header">
-        <h1>HHS Social Media Command Center</h1>
-        <div style="display: flex; gap: 10px;">
+        <div>
+            <h1>HHS Social Media Command Center</h1>
+            <div class="header-meta">
+                <span id="lastRefresh" class="refresh-indicator">Never refreshed</span>
+                <button id="refreshBtn" class="btn-icon" onclick="refreshData()" aria-label="Refresh data" title="Refresh data (R)">
+                    <span id="refreshIcon">🔄</span>
+                </button>
+                <label class="auto-refresh-toggle">
+                    <input type="checkbox" id="autoRefreshToggle" checked>
+                    <span>Auto-refresh</span>
+                </label>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
             <button onclick="document.getElementById('fileInput').click()" class="btn"
                 style="background-color: #475569;">Upload CSV</button>
             <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)">
@@ -286,35 +298,71 @@
     </div>
 
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('charts')">Charts & Analytics</button>
-        <button class="tab-btn" onclick="switchTab('grid')">Full Data Grid</button>
+        <button class="tab-btn active" data-tab="charts" onclick="dashboard.switchTab('charts')">Charts & Analytics</button>
+        <button class="tab-btn" data-tab="grid" onclick="dashboard.switchTab('grid')">Full Data Grid</button>
     </div>
 
     <!-- Charts View -->
     <div id="charts-view" class="view-section active">
         <div class="grid">
             <div class="sidebar" id="accountList">
-                <!-- Skeleton loader while loading -->
-                <div id="accountListSkeleton">
-                    <div class="skeleton skeleton-text"></div>
-                    <div class="skeleton skeleton-text"></div>
-                    <div class="skeleton skeleton-text"></div>
-                    <div class="skeleton skeleton-text"></div>
-                    <div class="skeleton skeleton-text"></div>
+                <!-- Search/Filter Input -->
+                <div class="sidebar-search">
+                    <input 
+                        type="text" 
+                        id="accountSearch" 
+                        class="search-input" 
+                        placeholder="Search accounts..."
+                        aria-label="Search accounts"
+                    />
+                    <span class="search-icon">🔍</span>
                 </div>
+                <!-- Enhanced skeleton loader while loading -->
+                <div id="accountListSkeleton">
+                    <div class="skeleton-account-item skeleton">
+                        <div class="skeleton-text"></div>
+                        <div class="skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-account-item skeleton">
+                        <div class="skeleton-text"></div>
+                        <div class="skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-account-item skeleton">
+                        <div class="skeleton-text"></div>
+                        <div class="skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-account-item skeleton">
+                        <div class="skeleton-text"></div>
+                        <div class="skeleton-text"></div>
+                    </div>
+                    <div class="skeleton-account-item skeleton">
+                        <div class="skeleton-text"></div>
+                        <div class="skeleton-text"></div>
+                    </div>
+                </div>
+                <!-- Account list content -->
+                <div id="accountListContent"></div>
             </div>
 
             <div class="main-content">
                 <div class="chart-container" id="followersChartContainer">
                     <div class="loading-overlay" id="followersLoading" style="display: none;">
-                        <div class="loading-spinner"></div>
+                        <div style="text-align: center;">
+                            <div class="loading-spinner"></div>
+                            <p style="margin-top: 12px; color: var(--text-secondary);">Loading followers data...</p>
+                        </div>
                     </div>
+                    <div id="followersChartSkeleton" class="skeleton skeleton-chart shimmer" style="display: none;"></div>
                     <canvas id="followersChart"></canvas>
                 </div>
                 <div class="chart-container" id="engagementChartContainer">
                     <div class="loading-overlay" id="engagementLoading" style="display: none;">
-                        <div class="loading-spinner"></div>
+                        <div style="text-align: center;">
+                            <div class="loading-spinner"></div>
+                            <p style="margin-top: 12px; color: var(--text-secondary);">Loading engagement data...</p>
+                        </div>
                     </div>
+                    <div id="engagementChartSkeleton" class="skeleton skeleton-chart shimmer" style="display: none;"></div>
                     <canvas id="engagementChart"></canvas>
                 </div>
             </div>
@@ -328,156 +376,96 @@
         </div>
     </div>
 
+    <!-- Service Worker Registration -->
     <script>
-        // Frontend cache for API responses
-        const apiCache = new Map();
-        const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-        // Debounce utility
-        function debounce(func, wait) {
-            let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
-                clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
-            };
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/js/service-worker.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
         }
-
-        // Cached fetch with TTL
-        async function cachedFetch(url, options = {}) {
-            const cacheKey = `${url}_${JSON.stringify(options)}`;
-            const cached = apiCache.get(cacheKey);
-            
-            if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-                return cached.data;
-            }
-
-            try {
-                const response = await fetch(url, options);
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const data = await response.json();
-                apiCache.set(cacheKey, { data, timestamp: Date.now() });
-                return data;
-            } catch (error) {
-                // Return cached data even if expired on error
-                if (cached) {
-                    return cached.data;
-                }
-                throw error;
-            }
-        }
-
-        let followersChart = null;
-        let engagementChart = null;
-        let gridInstance = null;
-        let chartLoadTimeout = null;
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.view-section').forEach(view => view.classList.remove('active'));
-
-            if (tab === 'charts') {
-                document.querySelector('button[onclick="switchTab(\'charts\')"]').classList.add('active');
-                document.getElementById('charts-view').classList.add('active');
-            } else {
-                document.querySelector('button[onclick="switchTab(\'grid\')"]').classList.add('active');
-                document.getElementById('grid-view').classList.add('active');
-                if (!gridInstance) {
-                    loadGrid();
-                }
-            }
-        }
-
-        async function loadGrid() {
-            const wrapper = document.getElementById('table-wrapper');
-            const loading = document.getElementById('gridLoading');
-            
-            try {
-                // Grid.js handles its own loading, but we show initial spinner
-                gridInstance = new gridjs.Grid({
-                    columns: ['Platform', 'Handle', 'Org', 'Date', 'Followers', 'Engagement', 'Posts', 'Likes', 'Comments', 'Shares'],
-                    server: {
-                        url: '/api/grid',
-                        then: (data) => {
-                            loading.style.display = 'none';
-                            // Handle paginated response
-                            if (data.pagination) {
-                                return data.data.map(row => [
-                                    row[0], row[1], row[2], row[3],
-                                    (row[4] || 0).toLocaleString(), 
-                                    (row[5] || 0).toLocaleString(), 
-                                    row[6] || 0,
-                                    (row[7] || 0).toLocaleString(), 
-                                    (row[8] || 0).toLocaleString(), 
-                                    (row[9] || 0).toLocaleString()
-                                ]);
-                            }
-                            // Fallback for non-paginated response
-                            return data.map(row => [
-                                row[0], row[1], row[2], row[3],
-                                (row[4] || 0).toLocaleString(), 
-                                (row[5] || 0).toLocaleString(), 
-                                row[6] || 0,
-                                (row[7] || 0).toLocaleString(), 
-                                (row[8] || 0).toLocaleString(), 
-                                (row[9] || 0).toLocaleString()
-                            ]);
-                        }
-                    },
-                    search: true,
-                    sort: true,
-                    pagination: {
-                        limit: 50
-                    },
-                    style: {
-                        table: {
-                            'white-space': 'nowrap'
-                        }
-                    },
-                    className: {
-                        table: 'table-auto'
-                    }
-                }).render(wrapper);
-            } catch (error) {
-                loading.style.display = 'none';
-                wrapper.innerHTML = `<div class="error-message">Failed to load grid data: ${error.message}</div>`;
-            }
-        }
-
+    </script>
+    
+    <!-- Toast Notification System -->
+    <script src="/static/js/toast.js"></script>
+    <!-- Error Handler -->
+    <script src="/static/js/error-handler.js"></script>
+    <!-- Modal System -->
+    <script src="/static/js/modal.js"></script>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    
+    <!-- Dashboard JavaScript (code split and lazy loaded) -->
+    <script src="/static/js/dashboard.js" defer></script>
+    
+    <!-- Helper functions for inline event handlers -->
+    <script>
         async function uploadCSV(input) {
             const file = input.files[0];
             if (!file) return;
-
+            
             const formData = new FormData();
             formData.append('file', file);
-
+            
+            // Show loading toast
+            const loadingToast = toast.info('Uploading CSV file...', 0);
+            
             try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
+                const response = await fetch('/upload', { method: 'POST', body: formData });
                 const result = await response.json();
                 
-                // Clear cache on successful upload
-                apiCache.clear();
-                
-                alert(result.message || result.error);
-                loadAccounts(); // Refresh list
+                if (response.ok) {
+                    toast.remove(loadingToast);
+                    toast.success(result.message || 'File uploaded successfully!');
+                    if (window.dashboard) window.dashboard.loadAccounts();
+                } else {
+                    toast.remove(loadingToast);
+                    if (window.errorHandler) {
+                        errorHandler.handleError({ status: response.status, message: result.error || 'Upload failed', response: { data: result } }, {
+                            retryAction: () => document.getElementById('fileInput').click()
+                        });
+                    } else {
+                        toast.error(result.error || 'Upload failed');
+                    }
+                }
             } catch (e) {
-                alert('Upload failed: ' + e.message);
+                toast.remove(loadingToast);
+                if (window.errorHandler) {
+                    errorHandler.handleError(e, {
+                        retryAction: () => document.getElementById('fileInput').click()
+                    });
+                } else {
+                    toast.error('Upload failed: ' + e.message);
+                }
             }
-            input.value = ''; // Reset
+            input.value = '';
+        }
+        
+        function refreshData() {
+            if (window.dashboard) {
+                window.dashboard.refreshData();
+            }
         }
 
         async function runScraper() {
+            // Show confirmation dialog
+            const confirmed = await modal.confirm({
+                title: 'Run Scraper',
+                message: 'This will run the scraper to collect metrics from all accounts. This may take a few minutes. Continue?',
+                confirmText: 'Run Scraper',
+                cancelText: 'Cancel',
+                confirmClass: 'btn'
+            });
+
+            if (!confirmed) return;
+
             const btn = document.getElementById('runScraperBtn');
             const originalText = btn.innerText;
             btn.innerText = 'Running...';
             btn.disabled = true;
-
+            
+            const loadingToast = toast.info('Running scraper...', 0);
+            
             try {
                 const response = await fetch('/api/run-scraper', {
                     method: 'POST',
@@ -486,171 +474,33 @@
                 });
                 const result = await response.json();
                 
-                // Clear cache after scraping
-                apiCache.clear();
-                
-                alert(result.message || result.error);
-                loadAccounts(); // Refresh data
+                if (response.ok) {
+                    toast.remove(loadingToast);
+                    toast.success(result.message || 'Scraper completed successfully!');
+                    if (window.dashboard) window.dashboard.loadAccounts();
+                } else {
+                    toast.remove(loadingToast);
+                    if (window.errorHandler) {
+                        errorHandler.handleError({ status: response.status, message: result.error || 'Scraper failed', response: { data: result } }, {
+                            retryAction: () => runScraper()
+                        });
+                    } else {
+                        toast.error(result.error || 'Scraper failed');
+                    }
+                }
             } catch (e) {
-                alert('Scraper failed: ' + e.message);
+                toast.remove(loadingToast);
+                if (window.errorHandler) {
+                    errorHandler.handleError(e, {
+                        retryAction: () => runScraper()
+                    });
+                } else {
+                    toast.error('Scraper failed: ' + e.message);
+                }
             }
-
             btn.innerText = originalText;
             btn.disabled = false;
         }
-
-        async function loadAccounts() {
-            const list = document.getElementById('accountList');
-            const skeleton = document.getElementById('accountListSkeleton');
-            
-            try {
-                // Show skeleton while loading
-                skeleton.style.display = 'block';
-                list.innerHTML = '';
-                list.appendChild(skeleton);
-
-                const data = await cachedFetch('/api/summary');
-                
-                skeleton.style.display = 'none';
-                list.innerHTML = '';
-
-                if (!data || data.length === 0) {
-                    list.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 20px;">No accounts found</div>';
-                    return;
-                }
-
-                // Sort by followers desc
-                data.sort((a, b) => (b.followers || 0) - (a.followers || 0));
-
-                data.forEach((acc, index) => {
-                    const div = document.createElement('div');
-                    div.className = 'account-item';
-                    div.id = `acc-${index}`;
-                    div.innerHTML = `
-                        <span class="account-handle">${acc.handle || 'N/A'}</span>
-                        <span class="account-meta">${acc.platform || 'N/A'} • ${(acc.followers || 0).toLocaleString()} followers</span>
-                    `;
-                    div.onclick = () => {
-                        // Remove active from all
-                        document.querySelectorAll('.account-item').forEach(el => el.classList.remove('active'));
-                        // Add to this
-                        div.classList.add('active');
-                        loadHistory(acc.platform, acc.handle);
-                    };
-                    list.appendChild(div);
-                });
-
-                // Load first account
-                if (data.length > 0) {
-                    const first = document.getElementById('acc-0');
-                    if (first) first.classList.add('active');
-                    loadHistory(data[0].platform, data[0].handle);
-                }
-            } catch (error) {
-                skeleton.style.display = 'none';
-                list.innerHTML = `<div class="error-message">Failed to load accounts: ${error.message}</div>`;
-            }
-        }
-
-        // Debounced history loading to prevent rapid chart updates
-        const debouncedLoadHistory = debounce(loadHistory, 300);
-
-        async function loadHistory(platform, handle) {
-            // Cancel any pending chart loads
-            if (chartLoadTimeout) {
-                clearTimeout(chartLoadTimeout);
-            }
-
-            // Show loading overlay
-            document.getElementById('followersLoading').style.display = 'flex';
-            document.getElementById('engagementLoading').style.display = 'flex';
-
-            try {
-                const data = await cachedFetch(`/api/history/${platform}/${handle}`);
-                
-                // Lazy load charts after a small delay to prevent blocking
-                chartLoadTimeout = setTimeout(() => {
-                    updateCharts(handle, data);
-                    document.getElementById('followersLoading').style.display = 'none';
-                    document.getElementById('engagementLoading').style.display = 'none';
-                }, 50);
-            } catch (error) {
-                document.getElementById('followersLoading').style.display = 'none';
-                document.getElementById('engagementLoading').style.display = 'none';
-                console.error('Failed to load history:', error);
-            }
-        }
-
-        function updateCharts(handle, data) {
-            const ctxFollowers = document.getElementById('followersChart').getContext('2d');
-            const ctxEngagement = document.getElementById('engagementChart').getContext('2d');
-
-            if (followersChart) followersChart.destroy();
-            if (engagementChart) engagementChart.destroy();
-
-            // Followers Chart
-            followersChart = new Chart(ctxFollowers, {
-                type: 'line',
-                data: {
-                    labels: data.dates || [],
-                    datasets: [{
-                        label: `Followers: ${handle}`,
-                        data: data.followers || [],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                        duration: 750 // Faster animation
-                    },
-                    plugins: {
-                        title: { display: true, text: 'Follower Growth', color: '#f8fafc' },
-                        legend: { labels: { color: '#94a3b8' } }
-                    },
-                    scales: {
-                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    }
-                }
-            });
-
-            // Engagement Chart
-            engagementChart = new Chart(ctxEngagement, {
-                type: 'bar',
-                data: {
-                    labels: data.dates || [],
-                    datasets: [{
-                        label: `Daily Engagement`,
-                        data: data.engagement || [],
-                        backgroundColor: '#10b981',
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: {
-                        duration: 750 // Faster animation
-                    },
-                    plugins: {
-                        title: { display: true, text: 'Daily Engagement Volume', color: '#f8fafc' },
-                        legend: { labels: { color: '#94a3b8' } }
-                    },
-                    scales: {
-                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
-                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } }
-                    }
-                }
-            });
-        }
-
-        // Initial load
-        loadAccounts();
     </script>
 </body>
 

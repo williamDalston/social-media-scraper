@@ -1,0 +1,56 @@
+# Production Environment Values
+# Use with: helm install -f config/values-prod.yaml
+
+replicaCount:
+  app: 5
+  celeryWorker: 3
+  celeryBeat: 1
+
+image:
+  tag: "latest"
+  pullPolicy: Always
+
+config:
+  environment: production
+  flaskEnv: production
+  logLevel: WARNING
+
+autoscaling:
+  enabled: true
+  minReplicas: 5
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  app:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  celeryWorker:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: api.example.com
+  tls:
+    - secretName: social-media-scraper-tls
+      hosts:
+        - api.example.com
+
+persistence:
+  enabled: true
+  size: 50Gi
+

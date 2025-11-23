@@ -11,6 +11,8 @@ from scraper.schema import DimAccount, FactFollowersSnapshot
 from scraper.collect_metrics import simulate_metrics
 from scraper.backfill import backfill_history
 from scraper.scrapers import get_scraper
+from tasks.production_optimization import intelligent_backoff, should_retry_job
+from tasks.job_checkpointing import save_job_checkpoint, load_job_checkpoint
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -127,7 +129,26 @@ def scrape_account(self, account_key, mode='simulated', db_path=None):
         job.progress = 100.0
         job.result = json.dumps(result_data)
         job.completed_at = datetime.utcnow()
+        
+        # Calculate duration
+        if job.started_at:
+            job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
+        
         session.commit()
+        
+        # Cache result if enabled
+        try:
+            from tasks.job_optimization import cache_job_result
+            cache_job_result(job_id, result_data)
+        except Exception as e:
+            logger.debug(f"Could not cache job result: {e}")
+        
+        # Check and start dependent jobs
+        try:
+            from tasks.job_dependencies import check_and_start_dependent_jobs
+            check_and_start_dependent_jobs(job_id)
+        except Exception as e:
+            logger.warning(f"Error checking dependent jobs: {e}")
         
         return result_data
         
@@ -148,11 +169,17 @@ def scrape_account(self, account_key, mode='simulated', db_path=None):
             except Exception as e:
                 logger.error(f"Error updating failed job status: {e}")
         
-        # Retry if we haven't exceeded max retries
+        # Intelligent retry with backoff
         if self.request.retries < self.max_retries:
-            retry_countdown = 60 * (self.request.retries + 1)
-            logger.info(f"Retrying scrape_account task (attempt {self.request.retries + 1}/{self.max_retries}) in {retry_countdown}s")
-            raise self.retry(exc=exc, countdown=retry_countdown)
+            should_retry, reason = should_retry_job(job, type(exc).__name__)
+            
+            if should_retry:
+                retry_countdown = intelligent_backoff(self.request.retries)
+                logger.info(f"Retrying scrape_account task (attempt {self.request.retries + 1}/{self.max_retries}) in {retry_countdown}s - {reason}")
+                raise self.retry(exc=exc, countdown=retry_countdown)
+            else:
+                logger.error(f"Not retrying scrape_account task: {reason}")
+                raise exc
         else:
             logger.error(f"Max retries exceeded for scrape_account task")
             raise exc

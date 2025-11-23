@@ -1,0 +1,39 @@
+# Docker Compose override file for development
+# Copy this to docker-compose.override.yml and customize as needed
+# This file is automatically used by docker-compose for local overrides
+
+version: '3.8'
+
+services:
+  app:
+    # Override command for development (with auto-reload)
+    command: ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "--reload", "--timeout", "120", "app:app"]
+    # Mount source code for live reloading
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    # Enable debug mode
+    environment:
+      - FLASK_ENV=development
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+
+  celery-worker:
+    # Reduce concurrency for development
+    command: celery -A celery_app worker --loglevel=debug --concurrency=2
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=DEBUG
+
+  celery-beat:
+    volumes:
+      - ./:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - LOG_LEVEL=DEBUG
+

@@ -6,6 +6,7 @@ This guide covers deploying the Social Media Scraper application to various envi
 
 - [Prerequisites](#prerequisites)
 - [Quick Start with Docker](#quick-start-with-docker)
+- [Using Makefile](#using-makefile)
 - [Environment Configuration](#environment-configuration)
 - [Database Setup](#database-setup)
 - [Deployment Methods](#deployment-methods)
@@ -50,14 +51,65 @@ nano .env
 # 4. Build and start services
 docker-compose up -d
 
-# 5. Run database migrations
-docker-compose exec app alembic upgrade head
+# 5. Initialize database (runs migrations)
+./scripts/init_db.sh
 
 # 6. Check service status
 docker-compose ps
 ```
 
+**Or use the Makefile for convenience:**
+```bash
+make build    # Build Docker images
+make up        # Start services
+make init-db   # Initialize database
+make logs      # View logs
+```
+
 The application will be available at `http://localhost:5000`
+
+---
+
+## Using Makefile
+
+The project includes a `Makefile` with convenient commands for common tasks:
+
+```bash
+# View all available commands
+make help
+
+# Build and start services
+make build
+make up
+
+# Database operations
+make init-db          # Initialize database
+make migrate          # Run migrations
+make backup           # Backup database
+
+# Service management
+make start            # Start services
+make stop             # Stop services
+make restart          # Restart services
+make status           # Check status
+
+# View logs
+make logs             # All services
+make logs-app         # App only
+make logs-worker      # Celery worker
+
+# Development
+make dev              # Start development environment
+make test             # Run tests
+make test-cov         # Run tests with coverage
+
+# Utilities
+make health           # Check application health
+make config           # Validate configuration
+make clean            # Clean up containers and volumes
+```
+
+For a complete list of commands, run `make help`.
 
 ---
 
@@ -121,17 +173,34 @@ DATABASE_URL=postgresql://scraper_user:your_password@localhost:5432/social_media
 
 Run migrations using Alembic:
 
+**Using the migration script (recommended):**
 ```bash
-# Upgrade to latest
+./scripts/migrate.sh upgrade      # Upgrade to latest
+./scripts/migrate.sh downgrade    # Downgrade by one
+./scripts/migrate.sh create "description"  # Create new migration
+./scripts/migrate.sh history      # Show history
+./scripts/migrate.sh current      # Show current version
+```
+
+**Using Makefile:**
+```bash
+make migrate              # Upgrade to latest
+make migrate-create MESSAGE="description"  # Create new migration
+make migrate-downgrade    # Downgrade by one
+make migrate-history     # Show history
+make migrate-current     # Show current version
+```
+
+**Direct Alembic commands:**
+```bash
+# With Docker
+docker-compose exec app alembic upgrade head
+docker-compose exec app alembic revision --autogenerate -m "description"
+
+# Without Docker
 alembic upgrade head
-
-# Create a new migration
 alembic revision --autogenerate -m "description"
-
-# Downgrade one version
 alembic downgrade -1
-
-# Show current version
 alembic current
 ```
 

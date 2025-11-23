@@ -65,3 +65,10 @@ test_*.py
 *.bak
 *.swp
 
+# Data and backups (should be mounted as volumes)
+data/
+backups/
+pids/
+
+# Development overrides
+docker-compose.override.yml

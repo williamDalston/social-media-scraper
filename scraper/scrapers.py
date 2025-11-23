@@ -16,6 +16,7 @@ from .platforms import (
     YouTubeScraper,
     TruthScraper,
     TikTokScraper,
+    RedditScraper,
 )
 
 # Set up logging
@@ -87,6 +88,7 @@ class RealScraper(BaseScraper):
         'truth_social': TruthScraper,
         'truth': TruthScraper,  # Alias
         'tiktok': TikTokScraper,
+        'reddit': RedditScraper,
     }
     
     def __init__(self):

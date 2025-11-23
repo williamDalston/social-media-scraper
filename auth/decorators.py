@@ -1,28 +1,48 @@
 from functools import wraps
 from flask import request, jsonify
 from .jwt_utils import get_current_user
+from .api_keys import verify_api_key
+from .ip_filter import is_ip_allowed, get_client_ip
 
 def require_auth(f):
     """
     Decorator to require authentication for an endpoint.
-    Provides detailed error messages for debugging (in development).
+    Supports both JWT tokens and API keys.
+    Also checks IP whitelist/blacklist.
     """
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        # Check IP filtering first
+        ip_allowed, ip_reason = is_ip_allowed()
+        if not ip_allowed:
+            return jsonify({
+                'error': 'Access denied',
+                'message': ip_reason
+            }), 403
+        
         auth_header = request.headers.get('Authorization')
         
         if not auth_header:
             return jsonify({
                 'error': 'Authentication required',
-                'message': 'Please provide a valid JWT token in the Authorization header',
-                'format': 'Authorization: Bearer <token>'
+                'message': 'Please provide a valid JWT token or API key in the Authorization header',
+                'format': 'Authorization: Bearer <token> or Authorization: ApiKey <key>'
             }), 401
         
-        user = get_current_user()
+        user = None
+        
+        # Try JWT authentication first
+        if auth_header.startswith('Bearer '):
+            user = get_current_user()
+        # Try API key authentication
+        elif auth_header.startswith('ApiKey ') or auth_header.startswith('apikey '):
+            api_key = auth_header.split(' ', 1)[1] if ' ' in auth_header else auth_header
+            user = verify_api_key(api_key)
+        
         if not user:
             return jsonify({
-                'error': 'Invalid or expired token',
-                'message': 'The provided token is invalid, expired, or the user account is inactive'
+                'error': 'Invalid or expired credentials',
+                'message': 'The provided token or API key is invalid, expired, or the user account is inactive'
             }), 401
         
         # Attach user to request context

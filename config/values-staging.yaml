@@ -1,0 +1,35 @@
+# Staging Environment Values
+# Use with: helm install -f config/values-staging.yaml
+
+replicaCount:
+  app: 2
+  celeryWorker: 1
+  celeryBeat: 1
+
+image:
+  tag: "staging"
+
+config:
+  environment: staging
+  flaskEnv: production
+  logLevel: INFO
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+
+resources:
+  app:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: api-staging.example.com
+
