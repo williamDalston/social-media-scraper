@@ -3,7 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HHS Social Media Scraper - GitHub</title>
+    <title>HHS Social Media Analytics Dashboard</title>
+    <script>
+        // Redirect to the functional dashboard if it exists, otherwise show landing page
+        if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
+            window.location.href = './public/index.html';
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -163,6 +169,23 @@
             margin: 4px;
         }
         
+        .dashboard-link {
+            display: block;
+            margin-top: 24px;
+            padding: 16px 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .dashboard-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
         @media (max-width: 768px) {
             .container {
                 padding: 32px 24px;
@@ -222,6 +245,9 @@
             <a href="https://github.com/williamDalston/social-media-scraper/blob/main/README.md" class="btn btn-secondary" target="_blank">
                 📖 Documentation
             </a>
+            <a href="./public/index.html" class="btn btn-primary">
+                📊 View Dashboard
+            </a>
         </div>
         
         <div class="info-box">
@@ -240,10 +266,13 @@
                 <span class="badge">Docker</span>
                 <span class="badge">Kubernetes</span>
             </div>
+            <a href="./public/index.html" class="dashboard-link">
+                → Access Interactive Dashboard (Static Version)
+            </a>
         </div>
         
         <div style="margin-top: 32px; opacity: 0.7; font-size: 14px;">
-            <p>For the live dashboard, please run the Flask application locally or deploy it to your server.</p>
+            <p>For the live dashboard with full functionality, please run the Flask application locally or deploy it to your server.</p>
             <p style="margin-top: 8px;">
                 <code style="background: rgba(0, 0, 0, 0.2); padding: 4px 8px; border-radius: 4px;">python app.py</code>
             </p>
@@ -251,4 +280,3 @@
     </div>
 </body>
 </html>
-
