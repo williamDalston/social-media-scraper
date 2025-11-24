@@ -93,8 +93,10 @@ jobs:
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          DATABASE_URL: sqlite:///social_media.db
         run: |
-          python -c "from scraper.schema import init_db; init_db('social_media.db')"
+          # Use explicit SQLite URL format (init_db also handles bare filenames, but explicit is safer)
+          python -c "from scraper.schema import init_db; init_db('sqlite:///social_media.db')"
           python -c "from scraper.extract_accounts import populate_accounts; populate_accounts()"
       
       - name: Run scraper
