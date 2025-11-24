@@ -151,6 +151,42 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     if not db_path:
         raise ValueError("Database path cannot be empty after stripping whitespace")
     
+    # CRITICAL SAFETY CHECK: If it ends in .db, it's ALWAYS SQLite, no exceptions
+    # This prevents any logic errors from causing SQLite files to be treated as production DBs
+    if db_path.endswith('.db') and not db_path.startswith('sqlite://'):
+        # Force SQLite handling - construct URL and return early
+        sqlite_url = f'sqlite:///{db_path}'
+        logger.info(f"Force-detected SQLite from .db extension: {db_path} -> {sqlite_url}")
+        try:
+            engine = create_engine(
+                sqlite_url,
+                poolclass=NullPool,
+                connect_args={
+                    'check_same_thread': False,
+                    'timeout': 20
+                },
+                echo=False
+            )
+            # Continue with rest of initialization (tables, indexes, etc.)
+            # But skip the detection logic below
+            if enable_profiling:
+                try:
+                    from config.database_performance import setup_query_monitoring
+                    setup_query_monitoring(engine)
+                except Exception as e:
+                    logger.warning(f"Could not set up database monitoring: {e}")
+                try:
+                    from scraper.utils.query_profiler import setup_query_listening
+                    setup_query_listening(engine)
+                except Exception as e:
+                    logger.warning(f"Could not set up query profiling: {e}")
+            
+            Base.metadata.create_all(engine)
+            _ensure_indexes(engine, db_path)
+            return engine
+        except Exception as e:
+            raise ValueError(f"Failed to create SQLite engine (forced detection) with URL '{sqlite_url}': {e}") from e
+    
     # Normalize and detect database type with comprehensive validation
     db_path_lower = db_path.lower()
     has_url_scheme = '://' in db_path
