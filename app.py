@@ -590,6 +590,31 @@ def run_scraper():
     # Get database path
     db_path = os.getenv('DATABASE_PATH', 'social_media.db')
     
+    # Run pre-flight checks to catch errors before starting
+    try:
+        from scraper.utils.preflight_checks import run_preflight_checks
+        
+        logger.info("Running pre-flight checks before scraper execution...")
+        preflight_results = run_preflight_checks(db_path=db_path, include_network=False)
+        
+        if not preflight_results['all_passed']:
+            error_summary = '\n'.join(preflight_results['errors'])
+            logger.error(f"Pre-flight checks failed:\n{error_summary}")
+            return jsonify({
+                'error': 'Pre-flight checks failed',
+                'details': preflight_results['errors'],
+                'checks': preflight_results['checks'],
+                'success': False
+            }), 400
+        
+        logger.info(f"✓ All pre-flight checks passed. {preflight_results['account_count']} accounts ready to scrape.")
+    except ImportError:
+        # Preflight checks module not available - continue anyway
+        logger.warning("Pre-flight checks module not available, skipping validation")
+    except Exception as e:
+        # Don't fail on preflight check errors - log and continue
+        logger.warning(f"Pre-flight checks encountered an error (continuing anyway): {str(e)}")
+    
     try:
         from scraper.collect_metrics import simulate_metrics
         import time
