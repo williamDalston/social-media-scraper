@@ -11,12 +11,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # JWT Configuration
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
-JWT_ALGORITHM = 'HS256'
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
 
-db_path = os.getenv('DATABASE_PATH', 'social_media.db')
+db_path = os.getenv("DATABASE_PATH", "social_media.db")
+
 
 def get_db_session():
     """Get database session."""
@@ -24,49 +25,57 @@ def get_db_session():
     Session = sessionmaker(bind=engine)
     return Session()
 
-def generate_token(user_id: int, role: str, token_type: str = 'access', token_version: int = 1) -> dict:
+
+def generate_token(
+    user_id: int, role: str, token_type: str = "access", token_version: int = 1
+) -> dict:
     """
     Generate JWT token for a user.
-    
+
     Args:
         user_id: User ID
         role: User role
         token_type: 'access' or 'refresh'
         token_version: Token version for rotation (incremented on refresh)
-    
+
     Returns:
         Dictionary with token and expiration
     """
-    expires_delta = JWT_ACCESS_TOKEN_EXPIRES if token_type == 'access' else JWT_REFRESH_TOKEN_EXPIRES
-    
+    expires_delta = (
+        JWT_ACCESS_TOKEN_EXPIRES
+        if token_type == "access"
+        else JWT_REFRESH_TOKEN_EXPIRES
+    )
+
     payload = {
-        'user_id': user_id,
-        'role': role,
-        'type': token_type,
-        'version': token_version,  # For token rotation
-        'exp': datetime.utcnow() + expires_delta,
-        'iat': datetime.utcnow()
+        "user_id": user_id,
+        "role": role,
+        "type": token_type,
+        "version": token_version,  # For token rotation
+        "exp": datetime.utcnow() + expires_delta,
+        "iat": datetime.utcnow(),
     }
-    
+
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-    
+
     return {
-        'token': token,
-        'expires_in': int(expires_delta.total_seconds()),
-        'token_type': 'Bearer',
-        'version': token_version
+        "token": token,
+        "expires_in": int(expires_delta.total_seconds()),
+        "token_type": "Bearer",
+        "version": token_version,
     }
+
 
 def verify_token(token: str) -> dict:
     """
     Verify and decode JWT token.
-    
+
     Args:
         token: JWT token string
-    
+
     Returns:
         Decoded token payload
-    
+
     Raises:
         jwt.ExpiredSignatureError: If token is expired
         jwt.InvalidTokenError: If token is invalid
@@ -79,40 +88,40 @@ def verify_token(token: str) -> dict:
     except jwt.InvalidTokenError:
         raise ValueError("Invalid token")
 
+
 def get_current_user():
     """
     Get current user from JWT token in request headers.
-    
+
     Returns:
         User object or None
     """
-    auth_header = request.headers.get('Authorization')
-    
+    auth_header = request.headers.get("Authorization")
+
     if not auth_header:
         return None
-    
+
     try:
         # Extract token from "Bearer <token>"
-        token = auth_header.split(' ')[1] if ' ' in auth_header else auth_header
+        token = auth_header.split(" ")[1] if " " in auth_header else auth_header
         payload = verify_token(token)
-        user_id = payload.get('user_id')
-        
+        user_id = payload.get("user_id")
+
         if not user_id:
             return None
-        
+
         session = get_db_session()
         user = session.query(User).filter_by(id=user_id, is_active=True).first()
-        
+
         if user:
             # Verify token version matches user's current version
-            token_version = payload.get('version', 1)
+            token_version = payload.get("version", 1)
             if token_version < user.token_version:
                 # Token has been rotated, invalid
                 session.close()
                 return None
-        
+
         session.close()
         return user
     except (ValueError, IndexError, Exception):
         return None
-

@@ -28,11 +28,11 @@ class BasePlatformScraper(ABC):
     Base class for all platform scrapers.
     Provides common functionality like rate limiting, retry logic, and error handling.
     """
-    
+
     def __init__(self, platform: str):
         """
         Initialize base scraper.
-        
+
         Args:
             platform: Platform name (e.g., 'x', 'instagram', 'youtube')
         """
@@ -42,18 +42,20 @@ class BasePlatformScraper(ABC):
         self.timeout = get_timeout(platform)
         self.max_retries = get_retry_count(platform)
         self.headers = get_headers(platform)
-        
+
         logger.info(f"Initialized {platform} scraper")
-    
+
     @abstractmethod
-    def scrape_account(self, account_url: str, handle: Optional[str] = None) -> Dict[str, Any]:
+    def scrape_account(
+        self, account_url: str, handle: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Scrape account data from a platform.
-        
+
         Args:
             account_url: Full URL to the account
             handle: Account handle (optional, for convenience)
-            
+
         Returns:
             Dictionary with scraped data:
             {
@@ -66,61 +68,68 @@ class BasePlatformScraper(ABC):
                 'subscribers_count': int,  # For YouTube
                 'views_count': int,  # For YouTube
             }
-            
+
         Raises:
             ScraperError: For various scraper errors
         """
         pass
-    
+
     def _apply_rate_limit(self):
         """Apply rate limiting before making a request."""
         self.rate_limiter.wait_if_needed()
-    
+
     def _get_proxy(self) -> Optional[dict]:
         """Get proxy configuration if available."""
         if self.proxy_manager:
             return self.proxy_manager.get_proxy()
         return None
-    
+
     def _handle_error(self, error: Exception, account_url: str):
         """
         Handle errors and convert to appropriate scraper exceptions.
-        
+
         Args:
             error: The exception that occurred
             account_url: URL that was being scraped
         """
         error_str = str(error).lower()
-        
-        if '429' in error_str or 'rate limit' in error_str:
+
+        if "429" in error_str or "rate limit" in error_str:
             raise RateLimitError(f"Rate limit exceeded for {self.platform}")
-        elif '401' in error_str or '403' in error_str or 'unauthorized' in error_str:
-            raise PrivateAccountError(f"Account is private or unauthorized: {account_url}")
-        elif '404' in error_str or 'not found' in error_str:
+        elif "401" in error_str or "403" in error_str or "unauthorized" in error_str:
+            raise PrivateAccountError(
+                f"Account is private or unauthorized: {account_url}"
+            )
+        elif "404" in error_str or "not found" in error_str:
             raise AccountNotFoundError(f"Account not found: {account_url}")
-        elif 'timeout' in error_str or 'connection' in error_str:
+        elif "timeout" in error_str or "connection" in error_str:
             raise NetworkError(f"Network error: {error}")
         else:
             raise ScraperError(f"Scraper error for {self.platform}: {error}")
-    
+
     def scrape(self, account) -> Optional[Dict[str, Any]]:
         """
         Main scrape method that applies rate limiting and retry logic.
-        
+
         Args:
             account: Account object with account_url and handle attributes
-            
+
         Returns:
             Scraped data dictionary or None if scraping fails
         """
         try:
             # Apply rate limiting
             self._apply_rate_limit()
-            
+
             # Scrape with retry logic
             @retry_with_backoff(
                 max_retries=self.max_retries,
-                retryable_exceptions=(RateLimitError, NetworkError, ConnectionError, TimeoutError),
+                retryable_exceptions=(
+                    RateLimitError,
+                    NetworkError,
+                    ConnectionError,
+                    TimeoutError,
+                ),
             )
             def _scrape_with_retry():
                 raw_data = self.scrape_account(account.account_url, account.handle)
@@ -128,9 +137,9 @@ class BasePlatformScraper(ABC):
                 if raw_data:
                     return validate_scraped_data(raw_data, self.platform)
                 return None
-            
+
             return _scrape_with_retry()
-            
+
         except AccountNotFoundError:
             logger.warning(f"Account not found: {account.account_url}")
             return None
@@ -146,4 +155,3 @@ class BasePlatformScraper(ABC):
         except Exception as e:
             logger.error(f"Unexpected error scraping {account.account_url}: {e}")
             return None
-

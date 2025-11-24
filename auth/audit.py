@@ -12,13 +12,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-db_path = os.getenv('DATABASE_PATH', 'social_media.db')
+db_path = os.getenv("DATABASE_PATH", "social_media.db")
+
 
 def get_db_session():
     """Get database session."""
     engine = init_db(db_path)
     Session = sessionmaker(bind=engine)
     return Session()
+
 
 def log_security_event(
     event_type: AuditEventType,
@@ -29,11 +31,11 @@ def log_security_event(
     action: str = None,
     details: dict = None,
     success: bool = True,
-    error_message: str = None
+    error_message: str = None,
 ):
     """
     Log a security event to the audit log.
-    
+
     Args:
         event_type: Type of event (from AuditEventType enum)
         user_id: ID of user performing action
@@ -49,8 +51,8 @@ def log_security_event(
     try:
         # Get request information
         ip_address = request.remote_addr if request else None
-        user_agent = request.headers.get('User-Agent') if request else None
-        
+        user_agent = request.headers.get("User-Agent") if request else None
+
         audit_entry = AuditLog(
             event_type=event_type.value,
             user_id=user_id,
@@ -61,11 +63,11 @@ def log_security_event(
             resource_id=resource_id,
             action=action,
             details=json.dumps(details) if details else None,
-            success='true' if success else 'false',
+            success="true" if success else "false",
             error_message=error_message,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.utcnow(),
         )
-        
+
         session.add(audit_entry)
         session.commit()
     except Exception as e:
@@ -76,17 +78,18 @@ def log_security_event(
     finally:
         session.close()
 
+
 def get_audit_logs(
     user_id: int = None,
     event_type: str = None,
     start_date: datetime = None,
     end_date: datetime = None,
     limit: int = 100,
-    offset: int = 0
+    offset: int = 0,
 ):
     """
     Retrieve audit logs with filtering.
-    
+
     Args:
         user_id: Filter by user ID
         event_type: Filter by event type
@@ -94,14 +97,14 @@ def get_audit_logs(
         end_date: End date for filtering
         limit: Maximum number of records to return
         offset: Offset for pagination
-    
+
     Returns:
         List of audit log entries
     """
     session = get_db_session()
     try:
         query = session.query(AuditLog)
-        
+
         if user_id:
             query = query.filter(AuditLog.user_id == user_id)
         if event_type:
@@ -110,11 +113,10 @@ def get_audit_logs(
             query = query.filter(AuditLog.timestamp >= start_date)
         if end_date:
             query = query.filter(AuditLog.timestamp <= end_date)
-        
+
         query = query.order_by(AuditLog.timestamp.desc())
         query = query.offset(offset).limit(limit)
-        
+
         return [log.to_dict() for log in query.all()]
     finally:
         session.close()
-

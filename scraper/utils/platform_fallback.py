@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 class FallbackStrategy(Enum):
     """Fallback strategy types."""
+
     NONE = "none"  # No fallback
     SIMULATE = "simulate"  # Use simulated data
     CACHE = "cache"  # Use cached data
@@ -22,13 +23,13 @@ class PlatformFallback:
     """
     Handles fallback mechanisms when scraping fails or platform changes.
     """
-    
+
     def __init__(self):
         """Initialize platform fallback."""
         self._fallback_strategies: Dict[str, FallbackStrategy] = {}
         self._fallback_history: Dict[str, List[Dict[str, Any]]] = {}
         logger.info("Initialized PlatformFallback")
-    
+
     def set_fallback_strategy(
         self,
         platform: str,
@@ -36,14 +37,14 @@ class PlatformFallback:
     ):
         """
         Set fallback strategy for a platform.
-        
+
         Args:
             platform: Platform name
             strategy: Fallback strategy to use
         """
         self._fallback_strategies[platform] = strategy
         logger.info(f"Set fallback strategy for {platform}: {strategy.value}")
-    
+
     def get_fallback_data(
         self,
         platform: str,
@@ -54,37 +55,48 @@ class PlatformFallback:
     ) -> Optional[Dict[str, Any]]:
         """
         Get fallback data when scraping fails.
-        
+
         Args:
             platform: Platform name
             account_key: Account key
             fallback_strategy: Strategy to use (uses platform default if None)
             previous_data: Previous snapshot data
             cached_data: Cached data if available
-            
+
         Returns:
             Fallback data dictionary or None
         """
         strategy = fallback_strategy or self._fallback_strategies.get(
-            platform,
-            FallbackStrategy.PREVIOUS
+            platform, FallbackStrategy.PREVIOUS
         )
-        
+
         if strategy == FallbackStrategy.NONE:
             return None
-        
+
         # Record fallback usage
         if platform not in self._fallback_history:
             self._fallback_history[platform] = []
-        
-        self._fallback_history[platform].append({
-            'account_key': account_key,
-            'strategy': strategy.value,
-            'timestamp': str(logging.Formatter().formatTime(logging.LogRecord(
-                name='', level=0, pathname='', lineno=0, msg='', args=(), exc_info=None
-            ))),
-        })
-        
+
+        self._fallback_history[platform].append(
+            {
+                "account_key": account_key,
+                "strategy": strategy.value,
+                "timestamp": str(
+                    logging.Formatter().formatTime(
+                        logging.LogRecord(
+                            name="",
+                            level=0,
+                            pathname="",
+                            lineno=0,
+                            msg="",
+                            args=(),
+                            exc_info=None,
+                        )
+                    )
+                ),
+            }
+        )
+
         # Get data based on strategy
         if strategy == FallbackStrategy.PREVIOUS:
             if previous_data:
@@ -92,14 +104,12 @@ class PlatformFallback:
                     f"Using previous snapshot data for {platform} account {account_key}"
                 )
                 return previous_data.copy()
-        
+
         elif strategy == FallbackStrategy.CACHE:
             if cached_data:
-                logger.info(
-                    f"Using cached data for {platform} account {account_key}"
-                )
+                logger.info(f"Using cached data for {platform} account {account_key}")
                 return cached_data.copy()
-        
+
         elif strategy == FallbackStrategy.SIMULATE:
             logger.warning(
                 f"Using simulated data for {platform} account {account_key} "
@@ -107,16 +117,22 @@ class PlatformFallback:
             )
             # Generate basic simulated data
             return {
-                'followers_count': previous_data.get('followers_count', 0) if previous_data else 0,
-                'following_count': previous_data.get('following_count', 0) if previous_data else 0,
-                'posts_count': previous_data.get('posts_count', 0) if previous_data else 0,
-                'likes_count': 0,
-                'comments_count': 0,
-                'shares_count': 0,
-                'is_fallback': True,
-                'fallback_strategy': 'simulate',
+                "followers_count": previous_data.get("followers_count", 0)
+                if previous_data
+                else 0,
+                "following_count": previous_data.get("following_count", 0)
+                if previous_data
+                else 0,
+                "posts_count": previous_data.get("posts_count", 0)
+                if previous_data
+                else 0,
+                "likes_count": 0,
+                "comments_count": 0,
+                "shares_count": 0,
+                "is_fallback": True,
+                "fallback_strategy": "simulate",
             }
-        
+
         elif strategy == FallbackStrategy.MULTIPLE:
             # Try multiple strategies in order
             if cached_data:
@@ -132,11 +148,11 @@ class PlatformFallback:
                     account_key,
                     FallbackStrategy.SIMULATE,
                     previous_data,
-                    cached_data
+                    cached_data,
                 )
-        
+
         return None
-    
+
     def detect_platform_change(
         self,
         platform: str,
@@ -144,53 +160,55 @@ class PlatformFallback:
     ) -> bool:
         """
         Detect if platform structure has changed based on error patterns.
-        
+
         Args:
             platform: Platform name
             error_pattern: Error message or pattern
-            
+
         Returns:
             True if platform change detected
         """
         # Common indicators of platform changes
         change_indicators = [
-            '404',
-            'not found',
-            'page structure',
-            'element not found',
-            'selector',
-            'html structure',
-            'api endpoint',
+            "404",
+            "not found",
+            "page structure",
+            "element not found",
+            "selector",
+            "html structure",
+            "api endpoint",
         ]
-        
+
         error_lower = error_pattern.lower()
-        
+
         for indicator in change_indicators:
             if indicator in error_lower:
                 logger.warning(
                     f"Possible platform change detected for {platform}: {error_pattern}"
                 )
                 return True
-        
+
         return False
-    
+
     def get_fallback_statistics(self, platform: Optional[str] = None) -> Dict[str, Any]:
         """
         Get statistics on fallback usage.
-        
+
         Args:
             platform: Platform name (None for all platforms)
-            
+
         Returns:
             Dictionary with fallback statistics
         """
         if platform:
             history = self._fallback_history.get(platform, [])
             return {
-                'platform': platform,
-                'total_fallbacks': len(history),
-                'by_strategy': {
-                    strategy.value: sum(1 for h in history if h['strategy'] == strategy.value)
+                "platform": platform,
+                "total_fallbacks": len(history),
+                "by_strategy": {
+                    strategy.value: sum(
+                        1 for h in history if h["strategy"] == strategy.value
+                    )
                     for strategy in FallbackStrategy
                 },
             }
@@ -198,10 +216,8 @@ class PlatformFallback:
             # All platforms
             total = sum(len(h) for h in self._fallback_history.values())
             return {
-                'total_fallbacks': total,
-                'by_platform': {
-                    p: len(h) for p, h in self._fallback_history.items()
-                },
+                "total_fallbacks": total,
+                "by_platform": {p: len(h) for p, h in self._fallback_history.items()},
             }
 
 
@@ -215,4 +231,3 @@ def get_platform_fallback() -> PlatformFallback:
     if _platform_fallback is None:
         _platform_fallback = PlatformFallback()
     return _platform_fallback
-

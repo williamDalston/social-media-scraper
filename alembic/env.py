@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # Import the Base and models
 from scraper.schema import Base
 from models.user import User
+
 try:
     from models.job import Job
 except ImportError:
@@ -38,7 +39,7 @@ if alembic_cfg.config_file_name is not None:
 
 # Override sqlalchemy.url with environment variable
 database_url = config.DATABASE_URL
-alembic_cfg.set_main_option('sqlalchemy.url', database_url)
+alembic_cfg.set_main_option("sqlalchemy.url", database_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -88,9 +89,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
@@ -100,4 +99,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

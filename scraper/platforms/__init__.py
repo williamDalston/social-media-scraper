@@ -14,15 +14,14 @@ from .reddit_scraper import RedditScraper
 from .flickr_scraper import FlickrScraper
 
 __all__ = [
-    'BasePlatformScraper',
-    'XScraper',
-    'InstagramScraper',
-    'FacebookScraper',
-    'LinkedInScraper',
-    'YouTubeScraper',
-    'TruthScraper',
-    'TikTokScraper',
-    'RedditScraper',
-    'FlickrScraper',
+    "BasePlatformScraper",
+    "XScraper",
+    "InstagramScraper",
+    "FacebookScraper",
+    "LinkedInScraper",
+    "YouTubeScraper",
+    "TruthScraper",
+    "TikTokScraper",
+    "RedditScraper",
+    "FlickrScraper",
 ]
-

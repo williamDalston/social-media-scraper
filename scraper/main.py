@@ -14,26 +14,36 @@ from config.logging_config import setup_logging, get_logger
 setup_logging()
 logger = get_logger(__name__)
 
+
 def main():
     parser = argparse.ArgumentParser(description="HHS Social Media Scraper System")
-    parser.add_argument('--init-db', action='store_true', help='Initialize the database')
-    parser.add_argument('--extract-accounts', action='store_true', help='Extract and populate accounts from JSON')
-    parser.add_argument('--collect-daily', action='store_true', help='Collect (simulate) daily metrics')
-    parser.add_argument('--all', action='store_true', help='Run all steps')
-    
+    parser.add_argument(
+        "--init-db", action="store_true", help="Initialize the database"
+    )
+    parser.add_argument(
+        "--extract-accounts",
+        action="store_true",
+        help="Extract and populate accounts from JSON",
+    )
+    parser.add_argument(
+        "--collect-daily", action="store_true", help="Collect (simulate) daily metrics"
+    )
+    parser.add_argument("--all", action="store_true", help="Run all steps")
+
     args = parser.parse_args()
-    
+
     if args.init_db or args.all:
         logger.info("Initializing database...")
         init_db()
-        
+
     if args.extract_accounts or args.all:
         logger.info("Populating accounts...")
         populate_accounts()
-        
+
     if args.collect_daily or args.all:
         logger.info("Collecting daily metrics...")
         simulate_metrics()
+
 
 if __name__ == "__main__":
     main()
