@@ -1092,7 +1092,7 @@
             const btn = document.getElementById('triggerBtn');
             const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '⏳ Running...';
+            btn.textContent = '⏳ Checking...';
 
             const statusDiv = document.getElementById('workflowStatus');
             
@@ -1102,6 +1102,35 @@
             
             // Try to call the API endpoint (works if Flask is running)
             try {
+                // First, run pre-flight checks
+                statusDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <div class="workflow-status">
+                            <div class="spinner"></div>
+                            <strong>Running pre-flight checks...</strong> Validating system before starting scraper.
+                        </div>
+                    </div>
+                `;
+                
+                // Try to run checks via API (optional endpoint)
+                let preflightResults = null;
+                try {
+                    const checkResponse = await fetch('/api/preflight-checks', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({})
+                    });
+                    if (checkResponse.ok) {
+                        preflightResults = await checkResponse.json();
+                    }
+                } catch (e) {
+                    // Preflight check endpoint not available - that's OK
+                    console.log('Pre-flight check endpoint not available, continuing...');
+                }
+                
+                // Now start the scraper
                 statusDiv.innerHTML = `
                     <div class="alert alert-info">
                         <div class="workflow-status">

@@ -655,7 +655,9 @@ def run_scraper():
         return jsonify({
             'message': 'Scraper finished successfully',
             'execution_time': round(elapsed_time, 2),
-            'success': True
+            'success': True,
+            'account_count': preflight_results.get('account_count', 0) if preflight_results else None,
+            'checks': preflight_results.get('checks', []) if preflight_results else None
         })
     except Exception as e:
         # Record failure (if metrics available)
