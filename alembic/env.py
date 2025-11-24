@@ -15,6 +15,14 @@ try:
     from models.job import Job
 except ImportError:
     pass  # Job model may not exist in all versions
+try:
+    from models.audit_log import AuditLog
+except ImportError:
+    pass  # AuditLog model may not exist in all versions
+try:
+    from auth.ip_filter import IPFilter
+except ImportError:
+    pass  # IPFilter model may not exist in all versions
 
 # Import config
 from config.settings import config

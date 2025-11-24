@@ -19,9 +19,15 @@ def upgrade() -> None:
     # Add password reset fields to users table
     op.add_column('users', sa.Column('password_reset_token', sa.String(255), nullable=True))
     op.add_column('users', sa.Column('password_reset_expires', sa.DateTime(), nullable=True))
+    
+    # Create index on password_reset_token for faster lookups
+    op.create_index('ix_users_password_reset_token', 'users', ['password_reset_token'])
 
 
 def downgrade() -> None:
+    # Drop index first
+    op.drop_index('ix_users_password_reset_token', table_name='users')
+    
     # Remove password reset fields
     op.drop_column('users', 'password_reset_expires')
     op.drop_column('users', 'password_reset_token')

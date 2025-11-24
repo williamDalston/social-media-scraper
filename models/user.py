@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum
-from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import enum
 import bcrypt
@@ -35,8 +34,6 @@ class User(Base):
     mfa_secret = Column(String(32), nullable=True)  # TOTP secret key
     backup_codes = Column(String(500), nullable=True)  # JSON array of backup codes
     # Password reset fields
-    password_reset_token = Column(String(255), nullable=True)
-    password_reset_expires = Column(DateTime, nullable=True)
     password_reset_token = Column(String(255), nullable=True, index=True)
     password_reset_expires = Column(DateTime, nullable=True)
     api_key = Column(String(255), nullable=True, unique=True, index=True)
