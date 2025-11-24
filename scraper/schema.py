@@ -1,3 +1,5 @@
+# FIXED VERSION – 2025-01-24 00:00:00 UTC
+# This file contains the fixed init_db() with proper URL validation
 print(">>> [schema.py] USING NEW FIXED VERSION – 2025-01-24 <<<", flush=True)
 
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Float, Text

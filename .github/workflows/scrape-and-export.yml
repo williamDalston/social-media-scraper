@@ -42,6 +42,23 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
       
+      - name: DEBUG – Show which schema.py is really being used
+        run: |
+          echo "=== Content of scraper/schema.py on the runner ==="
+          cat scraper/schema.py
+          echo ""
+          echo "=== Does it contain our fix? ==="
+          grep -n "_construct_sqlite_url\|Using database URL\|FIXED VERSION" scraper/schema.py || echo "FIX NOT PRESENT – OLD FILE!"
+          echo ""
+          echo "=== First 10 lines ==="
+          head -10 scraper/schema.py
+          echo ""
+          echo "=== Git commit info ==="
+          git log --oneline -5
+          echo ""
+          echo "=== Current branch ==="
+          git branch --show-current
+      
       - name: Verify schema.py contains the fix
         run: |
           echo "=== First 5 lines of scraper/schema.py ==="
