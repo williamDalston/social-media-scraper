@@ -153,9 +153,17 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     
     # CRITICAL SAFETY CHECK: If it ends in .db, it's ALWAYS SQLite, no exceptions
     # This prevents any logic errors from causing SQLite files to be treated as production DBs
-    if db_path.endswith('.db') and not db_path.startswith('sqlite://'):
+    # Check happens FIRST, before any other logic
+    if db_path.endswith('.db'):
         # Force SQLite handling - construct URL and return early
-        sqlite_url = f'sqlite:///{db_path}'
+        # Handle both 'sqlite:///' and plain filenames
+        if db_path.startswith('sqlite:///'):
+            sqlite_url = db_path
+        elif db_path.startswith('sqlite://'):
+            sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
+        else:
+            sqlite_url = f'sqlite:///{db_path}'
+        
         logger.info(f"Force-detected SQLite from .db extension: {db_path} -> {sqlite_url}")
         try:
             engine = create_engine(
@@ -187,6 +195,7 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         except Exception as e:
             raise ValueError(f"Failed to create SQLite engine (forced detection) with URL '{sqlite_url}': {e}") from e
     
+    # If we get here, it's not a .db file, continue with normal detection
     # Normalize and detect database type with comprehensive validation
     db_path_lower = db_path.lower()
     has_url_scheme = '://' in db_path
