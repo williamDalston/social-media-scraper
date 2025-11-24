@@ -254,9 +254,45 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         if len(sqlite_url) < 11:
             raise ValueError(f"SQLite URL too short: '{sqlite_url}'")
         
+        # CRITICAL: Validate URL with SQLAlchemy's URL parser BEFORE create_engine
+        try:
+            from sqlalchemy.engine.url import make_url
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Validating URL with SQLAlchemy parser...\n")
+            sys.stderr.flush()
+            # Try to parse the URL - this will raise an error if invalid
+            parsed_url = make_url(sqlite_url)
+            sys.stderr.write(f"[INIT_DB ULTIMATE] URL validation SUCCESS: {parsed_url}\n")
+            sys.stderr.flush()
+        except Exception as url_error:
+            sys.stderr.write(f"[INIT_DB ULTIMATE] URL validation FAILED: {url_error}\n")
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Invalid URL was: '{sqlite_url}'\n")
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Original db_path was: '{db_path_str}'\n")
+            sys.stderr.flush()
+            # Try to fix it one more time
+            if not sqlite_url.startswith('sqlite:///'):
+                fixed_url = f'sqlite:///{db_path_str}'
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Trying fixed URL: '{fixed_url}'\n")
+                sys.stderr.flush()
+                try:
+                    make_url(fixed_url)
+                    sqlite_url = fixed_url
+                    sys.stderr.write(f"[INIT_DB ULTIMATE] Fixed URL is valid!\n")
+                    sys.stderr.flush()
+                except Exception:
+                    raise ValueError(
+                        f"SQLite URL validation failed. Original: '{db_path_str}', "
+                        f"Constructed: '{sqlite_url}', Fixed: '{fixed_url}'. "
+                        f"Error: {url_error}"
+                    ) from url_error
+            else:
+                raise ValueError(
+                    f"SQLite URL validation failed for: '{sqlite_url}' (from '{db_path_str}'). "
+                    f"Error: {url_error}"
+                ) from url_error
+        
         # Create engine
         try:
-            sys.stderr.write(f"[INIT_DB ULTIMATE] Calling create_engine...\n")
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Calling create_engine with validated URL: '{sqlite_url}'\n")
             sys.stderr.flush()
             engine = create_engine(
                 sqlite_url,
