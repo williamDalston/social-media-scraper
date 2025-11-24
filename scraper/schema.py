@@ -120,46 +120,77 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     
     Args:
         db_path: Database path or connection string
+            - SQLite: 'social_media.db', 'sqlite:///path/to.db', or 'sqlite:///./relative.db'
+            - PostgreSQL: 'postgresql://user:pass@host:port/db'
+            - MySQL: 'mysql://user:pass@host:port/db'
         enable_profiling: Enable query profiling
         
     Returns:
         SQLAlchemy engine
+        
+    Raises:
+        ValueError: If db_path is invalid or cannot be parsed
     """
     import os
+    from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool, QueuePool
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     # Import Job model to register it with Base
     from models.job import Job  # noqa: F401
     
     # Validate db_path
-    if not db_path or not isinstance(db_path, str) or not db_path.strip():
-        raise ValueError(f"Invalid database path: {db_path!r}. Must be a non-empty string.")
+    if not db_path:
+        raise ValueError("Database path cannot be empty or None")
+    if not isinstance(db_path, str):
+        raise ValueError(f"Database path must be a string, got {type(db_path).__name__}")
     
     db_path = db_path.strip()
+    if not db_path:
+        raise ValueError("Database path cannot be empty after stripping whitespace")
     
-    # Check if using SQLite or production database
-    # SQLite detection: prioritize explicit indicators
+    # Normalize and detect database type with comprehensive validation
+    db_path_lower = db_path.lower()
+    has_url_scheme = '://' in db_path
+    
+    # SQLite detection - be very explicit
+    # Priority order:
     # 1. Explicitly starts with sqlite://
-    # 2. Ends with .db extension (most common SQLite indicator)
-    # 3. Simple filename without URL scheme (no ://)
-    # Production database: must explicitly start with postgresql://, postgresql+..., mysql://, or mysql+...
+    # 2. Ends with .db (most common indicator)
+    # 3. No URL scheme and doesn't start with postgresql/mysql
+    is_sqlite = False
+    is_production_db = False
     
-    # Explicit SQLite indicators
-    is_sqlite_explicit = (
-        db_path.startswith('sqlite://') or
-        db_path.endswith('.db')
-    )
+    if db_path.startswith('sqlite://'):
+        is_sqlite = True
+        logger.debug(f"Detected SQLite from explicit sqlite:// prefix: {db_path}")
+    elif db_path.endswith('.db'):
+        is_sqlite = True
+        logger.debug(f"Detected SQLite from .db extension: {db_path}")
+    elif db_path.startswith('postgresql://') or db_path.startswith('postgresql+'):
+        is_production_db = True
+        logger.debug(f"Detected PostgreSQL database: {db_path}")
+    elif db_path.startswith('mysql://') or db_path.startswith('mysql+'):
+        is_production_db = True
+        logger.debug(f"Detected MySQL database: {db_path}")
+    elif not has_url_scheme:
+        # No URL scheme and not a production DB - assume SQLite
+        is_sqlite = True
+        logger.debug(f"Detected SQLite from lack of URL scheme: {db_path}")
+    else:
+        # Has URL scheme but not recognized - error
+        raise ValueError(
+            f"Unrecognized database URL format: {db_path!r}. "
+            "Supported formats:\n"
+            "  - SQLite: 'social_media.db', 'sqlite:///path/to.db'\n"
+            "  - PostgreSQL: 'postgresql://user:pass@host:port/db'\n"
+            "  - MySQL: 'mysql://user:pass@host:port/db'"
+        )
     
-    # Check if it's a production database URL
-    is_production_db = (
-        db_path.startswith('postgresql://') or
-        db_path.startswith('postgresql+') or
-        db_path.startswith('mysql://') or
-        db_path.startswith('mysql+')
-    )
-    
-    # Determine if SQLite: explicit indicators OR not a production DB URL
-    is_sqlite = is_sqlite_explicit or (not is_production_db and '://' not in db_path)
+    # Create engine based on database type
+    engine = None
     
     if is_sqlite:
         # SQLite configuration - use NullPool
@@ -170,9 +201,10 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
             # Handle sqlite:// format (should be sqlite:///)
             sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
         else:
-            # Relative or absolute file path
+            # Relative or absolute file path - convert to SQLite URL
             sqlite_url = f'sqlite:///{db_path}'
         
+        logger.info(f"Creating SQLite engine with URL: {sqlite_url}")
         try:
             engine = create_engine(
                 sqlite_url,
@@ -184,64 +216,24 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 echo=False  # Set to True for SQL query logging in development
             )
         except Exception as e:
-            raise ValueError(f"Failed to create SQLite engine with URL '{sqlite_url}': {e}") from e
-    else:
+            raise ValueError(
+                f"Failed to create SQLite engine with URL '{sqlite_url}': {e}. "
+                f"Original db_path: {db_path!r}"
+            ) from e
+            
+    elif is_production_db:
         # Production database configuration - use QueuePool with optimization
-        # Safety check: if it looks like SQLite but wasn't detected, handle it as SQLite
-        if db_path.endswith('.db') or (not '://' in db_path and not db_path.startswith('postgresql') and not db_path.startswith('mysql')):
-            # This should have been caught by SQLite detection, but handle it anyway
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                f"Database path '{db_path}' appears to be SQLite but was not detected. "
-                "Falling back to SQLite handling."
+        # Validate that db_path looks like a valid database URL
+        if not (db_path.startswith('postgresql://') or 
+                db_path.startswith('postgresql+psycopg2://') or
+                db_path.startswith('mysql://') or
+                db_path.startswith('mysql+pymysql://')):
+            raise ValueError(
+                f"Invalid production database URL format: {db_path!r}. "
+                "Expected format: postgresql://user:pass@host:port/db or mysql://user:pass@host:port/db"
             )
-            # Treat as SQLite
-            if db_path.startswith('sqlite:///'):
-                sqlite_url = db_path
-            elif db_path.startswith('sqlite://'):
-                sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
-            else:
-                sqlite_url = f'sqlite:///{db_path}'
-            
-            try:
-                engine = create_engine(
-                    sqlite_url,
-                    poolclass=NullPool,
-                    connect_args={
-                        'check_same_thread': False,
-                        'timeout': 20
-                    },
-                    echo=False
-                )
-            except Exception as e:
-                raise ValueError(f"Failed to create SQLite engine with URL '{sqlite_url}': {e}") from e
-        else:
-            # Production database configuration - use QueuePool with optimization
-            # Validate that db_path looks like a valid database URL
-            if not (db_path.startswith('postgresql://') or 
-                    db_path.startswith('postgresql+psycopg2://') or
-                    db_path.startswith('mysql://') or
-                    db_path.startswith('mysql+pymysql://')):
-                raise ValueError(
-                    f"Invalid database URL format: {db_path!r}. "
-                    "Expected format: postgresql://user:pass@host:port/db or mysql://user:pass@host:port/db. "
-                    f"For SQLite files, use a path ending in .db or starting with sqlite:///"
-                )
-            
-            try:
-                from config.performance_tuning import PerformanceTuner
-                tuner = PerformanceTuner()
-                pool_config = tuner.optimize_database_connections()
-                
-                engine = create_engine(
-                    db_path,
-                    poolclass=QueuePool,
-                    **pool_config
-                )
-            except Exception as e:
-                raise ValueError(f"Failed to create database engine with URL '{db_path}': {e}") from e
         
+        logger.info(f"Creating production database engine: {db_path[:50]}...")  # Log partial URL for security
         try:
             from config.performance_tuning import PerformanceTuner
             tuner = PerformanceTuner()
@@ -252,8 +244,25 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 poolclass=QueuePool,
                 **pool_config
             )
+        except ImportError:
+            # PerformanceTuner not available - use default config
+            logger.warning("PerformanceTuner not available, using default pool configuration")
+            engine = create_engine(
+                db_path,
+                poolclass=QueuePool
+            )
         except Exception as e:
-            raise ValueError(f"Failed to create database engine with URL '{db_path}': {e}") from e
+            raise ValueError(f"Failed to create production database engine with URL '{db_path}': {e}") from e
+    else:
+        # This should never happen due to validation above, but handle it anyway
+        raise ValueError(
+            f"Unable to determine database type from path: {db_path!r}. "
+            "This is a bug - please report it."
+        )
+    
+    # Verify engine was created
+    if engine is None:
+        raise RuntimeError(f"Failed to create database engine for path: {db_path!r}")
     
     # Set up query monitoring if profiling enabled
     if enable_profiling:
@@ -278,6 +287,7 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     Base.metadata.create_all(engine)
     
     # Add indexes if they don't exist (SQLite only)
+    # Check if SQLite for index creation (reuse detection logic)
     if is_sqlite:
         _ensure_indexes(engine, db_path)
     
