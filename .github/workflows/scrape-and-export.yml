@@ -103,8 +103,49 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           DATABASE_URL: sqlite:///social_media.db
         run: |
-          echo "=== WORKFLOW VERSION: Using explicit sqlite:/// URL format - 2025-01-24 ==="
-          python -c "from scraper.schema import init_db; init_db('sqlite:///social_media.db')"
+          echo "=== WORKFLOW VERSION: Using diagnostic script with comprehensive error handling - 2025-01-24 ==="
+          echo "Working directory: $(pwd)"
+          echo "Python version: $(python --version)"
+          echo ""
+          python scripts/init_db_ci.py || {
+            echo ""
+            echo "=== FALLBACK: Trying direct init_db() call ==="
+            python -c "
+            import os
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path.cwd()))
+            
+            try:
+                from scraper.schema import init_db, Base
+                from sqlalchemy import create_engine
+                
+                # Try absolute path first
+                db_path = os.path.abspath('social_media.db')
+                print(f'Attempting with absolute path: {db_path}')
+                engine = init_db(db_path)
+                print('✓ Success with absolute path')
+                engine.dispose()
+            except Exception as e1:
+                print(f'Absolute path failed: {e1}')
+                try:
+                    # Fallback to relative path
+                    print('Attempting with relative path: social_media.db')
+                    engine = init_db('social_media.db')
+                    print('✓ Success with relative path')
+                    engine.dispose()
+                except Exception as e2:
+                    print(f'Relative path failed: {e2}')
+                    # Last resort: direct creation
+                    print('Attempting direct Base.metadata.create_all()')
+                    db_path = os.path.abspath('social_media.db')
+                    url = f'sqlite:///{db_path.replace(os.sep, \"/\")}'
+                    engine = create_engine(url, future=True)
+                    Base.metadata.create_all(engine)
+                    print('✓ Success with direct creation')
+                    engine.dispose()
+            "
+          }
       
       - name: Populate accounts
         env:
