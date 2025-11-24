@@ -340,55 +340,37 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     logger = logging.getLogger(__name__)
     
     # Continue with normalization and other logic for non-.db files
-            # Make absolute path - handle errors gracefully
-            try:
-                if not os.path.isabs(db_path_str):
-                    abs_path = os.path.abspath(db_path_str)
-                else:
-                    abs_path = db_path_str
-                
-                # Validate absolute path
-                if not abs_path or not isinstance(abs_path, str):
-                    raise ValueError(f"Invalid absolute path: {abs_path}")
-                
-                # Normalize path separators - ensure forward slashes only
-                normalized = abs_path.replace('\\', '/')
-                # Remove any double slashes (but keep sqlite:///)
-                while '//' in normalized and not normalized.startswith('sqlite:///'):
-                    normalized = normalized.replace('//', '/')
-                
-                # Construct SQLite URL
-                sqlite_url = f'sqlite:///{normalized}'
-            except Exception as path_error:
-                # Ultimate fallback - use the original path as-is
-                print(f"[INIT_DB ULTIMATE CHECK] Path normalization failed: {path_error}, using simple URL", file=sys.stderr, flush=True)
-                # Just prepend sqlite:/// to the original path
-                sqlite_url = f'sqlite:///{db_path_str.replace(os.sep, "/")}'
+    # PREEMPTIVE VALIDATION: Use the normalization utility to catch errors early
+    try:
+        from scraper.utils.db_path_normalizer import normalize_db_path, validate_sqlite_url
+        normalized_path, sqlite_url, is_sqlite = normalize_db_path(db_path)
         
-        # CRITICAL: Validate URL format before using
-        print(f"[INIT_DB ULTIMATE CHECK] SQLite URL before validation: '{sqlite_url}'", file=sys.stderr, flush=True)
+        # Log the normalization result
+        print(f"[INIT_DB] Normalized path: '{db_path}' -> is_sqlite={is_sqlite}, sqlite_url='{sqlite_url}'", file=sys.stderr, flush=True)
+        logger.info(f"[INIT_DB] Normalized: db_path='{db_path}' -> is_sqlite={is_sqlite}")
         
-        if not sqlite_url:
-            raise ValueError("SQLite URL is empty in ultimate check")
-        if not isinstance(sqlite_url, str):
-            raise ValueError(f"SQLite URL must be a string, got {type(sqlite_url).__name__}")
-        if not sqlite_url.startswith('sqlite:///'):
-            # Try to fix it
-            if sqlite_url.startswith('sqlite://'):
-                sqlite_url = sqlite_url.replace('sqlite://', 'sqlite:///', 1)
-            else:
-                sqlite_url = f'sqlite:///{sqlite_url}'
-            print(f"[INIT_DB ULTIMATE CHECK] Fixed SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+    except ImportError:
+        # Fallback if normalization utility not available
+        print(f"[INIT_DB WARNING] db_path_normalizer not available, using fallback logic", file=sys.stderr, flush=True)
+        normalized_path = db_path
+        sqlite_url = None
+        is_sqlite = None  # Will be determined below
+    except Exception as norm_error:
+        # If normalization fails, log and continue with original path
+        print(f"[INIT_DB WARNING] Normalization failed: {norm_error}, using original path", file=sys.stderr, flush=True)
+        logger.warning(f"Path normalization failed: {norm_error}")
+        normalized_path = db_path
+        sqlite_url = None
+        is_sqlite = None
+    
+    # CRITICAL SAFETY CHECK: If normalization says it's SQLite, handle it immediately
+    if is_sqlite is True and sqlite_url:
+        # We already have a validated SQLite URL from normalization
+        print(f"[INIT_DB] Using pre-normalized SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+        if not validate_sqlite_url(sqlite_url):
+            raise ValueError(f"Normalized SQLite URL is invalid: '{sqlite_url}'")
         
-        # Final validation
-        if not sqlite_url.startswith('sqlite:///'):
-            raise ValueError(f"Invalid SQLite URL format after fixes: '{sqlite_url}' (original: '{db_path_str}')")
-        
-        print(f"[INIT_DB ULTIMATE CHECK] Validated SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
-        
-        # Create engine immediately with comprehensive error handling
         try:
-            print(f"[INIT_DB ULTIMATE CHECK] About to call create_engine with: '{sqlite_url}'", file=sys.stderr, flush=True)
             engine = create_engine(
                 sqlite_url,
                 poolclass=NullPool,
