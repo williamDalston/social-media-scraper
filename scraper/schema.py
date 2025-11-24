@@ -209,6 +209,14 @@ def init_db(db_path=None, enable_profiling: bool = False):
     from sqlalchemy.pool import NullPool, QueuePool
     from sqlalchemy.engine.url import make_url
     
+    # CRITICAL: Verify this is the new version with _construct_sqlite_url
+    if '_construct_sqlite_url' not in globals():
+        raise RuntimeError(
+            "ERROR: Old version of schema.py is running! "
+            "The new version with _construct_sqlite_url() is required. "
+            "Please ensure the latest code is checked out and pushed."
+        )
+    
     # Step 1: Determine the database URL
     # Priority: db_path argument > DATABASE_URL env var > default SQLite
     if db_path:

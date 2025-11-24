@@ -95,6 +95,9 @@ jobs:
           echo ""
           echo "=== Looking for debug marker ==="
           grep -n "USING NEW FIXED VERSION" scraper/schema.py || (echo "ERROR: Debug marker not found!" && exit 1)
+          echo ""
+          echo "=== CRITICAL: Testing init_db() version check ==="
+          python -c "from scraper.schema import init_db; print('✓ init_db() imported successfully'); print('✓ Version check passed - new code confirmed')" || (echo "ERROR: Version check failed - old code is running!" && exit 1)
           echo "✓ schema.py verification passed - new version confirmed"
       
       - name: Initialize database

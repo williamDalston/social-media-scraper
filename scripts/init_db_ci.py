@@ -33,14 +33,15 @@ def main():
         print()
         
         # Try multiple path formats to ensure compatibility
-        # Priority: Explicit SQLite URL format (recommended) > absolute path > relative path
+        # CRITICAL: Always use explicit SQLite URL format to prevent ArgumentError
+        # Never use bare filenames - they cause "Could not parse SQLAlchemy URL" errors
         print("Step 2: Initializing database...")
         test_paths = [
             'sqlite:///social_media.db',  # Explicit SQLite URL (recommended - prevents ArgumentError)
             f'sqlite:///{db_path}',  # Full URL with absolute path
-            db_path,  # Absolute path (fallback)
-            'social_media.db',  # Relative path (last resort)
         ]
+        # NOTE: Removed bare filename fallbacks ('social_media.db', db_path) 
+        # because they cause ArgumentError if old schema.py code is running
         
         engine = None
         last_error = None
