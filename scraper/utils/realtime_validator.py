@@ -5,7 +5,7 @@ Real-time data validation during scraping.
 import logging
 from typing import Dict, Any, Optional, Callable
 
-from .validators import get_result_validator
+from .result_validator import get_result_validator
 from .data_quality import get_quality_scorer
 
 logger = logging.getLogger(__name__)
