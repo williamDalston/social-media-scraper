@@ -340,13 +340,6 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     logger = logging.getLogger(__name__)
     
     # Continue with normalization and other logic for non-.db files
-        print(f"[INIT_DB ULTIMATE CHECK] Detected .db file at START: '{db_path_str}'", file=sys.stderr, flush=True)
-        # Construct SQLite URL immediately
-        if db_path_str.startswith('sqlite:///'):
-            sqlite_url = db_path_str
-        elif db_path_str.startswith('sqlite://'):
-            sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
-        else:
             # Make absolute path - handle errors gracefully
             try:
                 if not os.path.isabs(db_path_str):
