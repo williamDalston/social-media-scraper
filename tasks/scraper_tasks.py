@@ -34,44 +34,103 @@ def scrape_account(self, account_key, mode='real', db_path=None):
         db_path = os.getenv('DB_PATH', 'social_media.db')
     
     job_id = self.request.id
-    session = get_db_session(db_path)
+    session = None
     
     try:
+        # Validate inputs
+        if not account_key:
+            raise ValueError("account_key is required")
+        if not isinstance(account_key, (int, str)):
+            raise ValueError(f"account_key must be int or str, got {type(account_key).__name__}")
+        
+        session = get_db_session(db_path)
+        
         # Create or update job record
         from models.job import Job
-        job = session.query(Job).filter_by(job_id=job_id).first()
-        if not job:
-            # Job might not exist if created after task started, create it now
-            try:
-                job = create_job_record(job_id, 'scrape_account', account_key=account_key, db_path=db_path)
-                session = get_db_session(db_path)  # Refresh session
-                job = session.query(Job).filter_by(job_id=job_id).first()
-            except Exception as e:
-                logger.warning(f"Could not create job record: {e}, continuing without it")
+        job = None
+        try:
+            job = session.query(Job).filter_by(job_id=job_id).first()
+            if not job:
+                # Job might not exist if created after task started, create it now
+                try:
+                    job = create_job_record(job_id, 'scrape_account', account_key=account_key, db_path=db_path)
+                    session = get_db_session(db_path)  # Refresh session
+                    job = session.query(Job).filter_by(job_id=job_id).first()
+                except Exception as e:
+                    logger.warning(
+                        f"Could not create job record: {e}, continuing without it",
+                        extra={'job_id': job_id, 'account_key': account_key}
+                    )
+        except Exception as e:
+            logger.error(
+                f"Error querying job record: {e}",
+                extra={'job_id': job_id, 'account_key': account_key}
+            )
+            # Continue without job record
         
         if job:
-            job.status = 'running'
-            job.started_at = datetime.utcnow()
-            session.commit()
+            try:
+                job.status = 'running'
+                job.started_at = datetime.utcnow()
+                session.commit()
+            except Exception as e:
+                logger.error(
+                    f"Error updating job status: {e}",
+                    extra={'job_id': job_id, 'account_key': account_key}
+                )
+                session.rollback()
         
         # Get account
-        account = session.query(DimAccount).filter_by(account_key=account_key).first()
-        if not account:
-            raise ValueError(f"Account with key {account_key} not found")
+        try:
+            account = session.query(DimAccount).filter_by(account_key=account_key).first()
+            if not account:
+                raise ValueError(f"Account with key {account_key} not found")
+        except Exception as e:
+            logger.error(
+                f"Error querying account: {e}",
+                extra={'account_key': account_key}
+            )
+            raise
         
         # Update progress
-        self.update_state(state='PROGRESS', meta={'progress': 25, 'message': f'Scraping {account.handle}...'})
-        update_job_progress(job_id, 25, 'running', {'message': f'Scraping {account.handle}...'})
+        try:
+            self.update_state(state='PROGRESS', meta={'progress': 25, 'message': f'Scraping {account.handle}...'})
+            update_job_progress(job_id, 25, 'running', {'message': f'Scraping {account.handle}...'})
+        except Exception as e:
+            logger.warning(f"Error updating progress: {e}", extra={'job_id': job_id})
         
         # Get scraper and scrape
         logger.info(f"Starting scrape for account {account.handle} (key: {account_key})")
-        scraper = get_scraper(mode)
-        data = scraper.scrape(account)
+        try:
+            scraper = get_scraper(mode)
+            if not scraper:
+                raise ValueError(f"Could not get scraper for mode: {mode}")
+        except Exception as e:
+            logger.error(f"Error getting scraper: {e}", extra={'mode': mode, 'account_key': account_key})
+            raise
+        
+        try:
+            data = scraper.scrape(account)
+        except Exception as scrape_error:
+            logger.error(
+                f"Error during scraping: {scrape_error}",
+                extra={
+                    'account_key': account_key,
+                    'platform': account.platform,
+                    'handle': account.handle,
+                    'error_type': type(scrape_error).__name__
+                }
+            )
+            raise
         
         if not data:
             error_msg = f"Failed to scrape account {account.handle} - scraper returned no data"
-            logger.error(error_msg)
+            logger.error(error_msg, extra={'account_key': account_key, 'platform': account.platform})
             raise ValueError(error_msg)
+        
+        # Validate scraped data
+        if not isinstance(data, dict):
+            raise ValueError(f"Scraped data must be a dictionary, got {type(data).__name__}")
         
         # Update progress
         self.update_state(state='PROGRESS', meta={'progress': 75, 'message': 'Saving results...'})
@@ -86,46 +145,98 @@ def scrape_account(self, account_key, mode='real', db_path=None):
         
         # Update account metadata from scraped data
         from scraper.utils.metrics_calculator import update_account_metadata, calculate_snapshot_metrics
-        update_account_metadata(account, data)
+        try:
+            update_account_metadata(account, data)
+        except Exception as metadata_error:
+            logger.warning(
+                f"Error updating account metadata: {metadata_error}",
+                extra={'account_key': account_key}
+            )
+            # Continue even if metadata update fails
+        
+        # Safely convert data values to integers
+        def safe_int(value, default=0):
+            """Safely convert value to integer."""
+            try:
+                if value is None:
+                    return default
+                return int(float(value)) if value else default
+            except (ValueError, TypeError):
+                return default
         
         if existing:
             # Update existing snapshot
-            existing.followers_count = data.get('followers_count', 0)
-            existing.following_count = data.get('following_count', 0)
-            existing.posts_count = data.get('posts_count', 0)
-            existing.likes_count = data.get('likes_count', 0)
-            existing.comments_count = data.get('comments_count', 0)
-            existing.shares_count = data.get('shares_count', 0)
-            existing.subscribers_count = data.get('subscribers_count', 0)  # For YouTube
-            existing.video_views = data.get('views_count', 0)  # For YouTube
-            existing.videos_count = data.get('videos_count', 0)  # For YouTube
-            existing.engagements_total = existing.likes_count + existing.comments_count + existing.shares_count
-            
-            # Recalculate metrics
-            calculate_snapshot_metrics(existing, session, account, data)
+            try:
+                existing.followers_count = safe_int(data.get('followers_count'), 0)
+                existing.following_count = safe_int(data.get('following_count'), 0)
+                existing.posts_count = safe_int(data.get('posts_count'), 0)
+                existing.likes_count = safe_int(data.get('likes_count'), 0)
+                existing.comments_count = safe_int(data.get('comments_count'), 0)
+                existing.shares_count = safe_int(data.get('shares_count'), 0)
+                existing.subscribers_count = safe_int(data.get('subscribers_count'), 0)  # For YouTube
+                existing.video_views = safe_int(data.get('views_count'), 0)  # For YouTube
+                existing.videos_count = safe_int(data.get('videos_count'), 0)  # For YouTube
+                existing.engagements_total = existing.likes_count + existing.comments_count + existing.shares_count
+                
+                # Recalculate metrics
+                try:
+                    calculate_snapshot_metrics(existing, session, account, data)
+                except Exception as metrics_error:
+                    logger.warning(
+                        f"Error calculating metrics: {metrics_error}",
+                        extra={'account_key': account_key}
+                    )
+            except Exception as update_error:
+                logger.error(
+                    f"Error updating existing snapshot: {update_error}",
+                    extra={'account_key': account_key}
+                )
+                raise
         else:
             # Create new snapshot
-            snapshot = FactFollowersSnapshot(
-                account_key=account_key,
-                snapshot_date=today,
-                followers_count=data.get('followers_count', 0),
-                following_count=data.get('following_count', 0),
-                posts_count=data.get('posts_count', 0),
-                likes_count=data.get('likes_count', 0),
-                comments_count=data.get('comments_count', 0),
-                shares_count=data.get('shares_count', 0),
-                subscribers_count=data.get('subscribers_count', 0),  # For YouTube
-                video_views=data.get('views_count', 0),  # For YouTube
-                videos_count=data.get('videos_count', 0),  # For YouTube
-                engagements_total=0
-            )
-            snapshot.engagements_total = snapshot.likes_count + snapshot.comments_count + snapshot.shares_count
-            
-            # Calculate additional metrics
-            calculate_snapshot_metrics(snapshot, session, account, data)
-            session.add(snapshot)
+            try:
+                snapshot = FactFollowersSnapshot(
+                    account_key=account_key,
+                    snapshot_date=today,
+                    followers_count=safe_int(data.get('followers_count'), 0),
+                    following_count=safe_int(data.get('following_count'), 0),
+                    posts_count=safe_int(data.get('posts_count'), 0),
+                    likes_count=safe_int(data.get('likes_count'), 0),
+                    comments_count=safe_int(data.get('comments_count'), 0),
+                    shares_count=safe_int(data.get('shares_count'), 0),
+                    subscribers_count=safe_int(data.get('subscribers_count'), 0),  # For YouTube
+                    video_views=safe_int(data.get('views_count'), 0),  # For YouTube
+                    videos_count=safe_int(data.get('videos_count'), 0),  # For YouTube
+                    engagements_total=0
+                )
+                snapshot.engagements_total = snapshot.likes_count + snapshot.comments_count + snapshot.shares_count
+                
+                # Calculate additional metrics
+                try:
+                    calculate_snapshot_metrics(snapshot, session, account, data)
+                except Exception as metrics_error:
+                    logger.warning(
+                        f"Error calculating metrics: {metrics_error}",
+                        extra={'account_key': account_key}
+                    )
+                
+                session.add(snapshot)
+            except Exception as create_error:
+                logger.error(
+                    f"Error creating snapshot: {create_error}",
+                    extra={'account_key': account_key}
+                )
+                raise
         
-        session.commit()
+        try:
+            session.commit()
+        except Exception as commit_error:
+            logger.error(
+                f"Error committing snapshot: {commit_error}",
+                extra={'account_key': account_key}
+            )
+            session.rollback()
+            raise
         
         # Update job as completed
         result_data = {
@@ -137,16 +248,32 @@ def scrape_account(self, account_key, mode='real', db_path=None):
             'snapshot_date': today.isoformat()
         }
         
-        job.status = 'completed'
-        job.progress = 100.0
-        job.result = json.dumps(result_data)
-        job.completed_at = datetime.utcnow()
-        
-        # Calculate duration
-        if job.started_at:
-            job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
-        
-        session.commit()
+        if job:
+            try:
+                job.status = 'completed'
+                job.progress = 100.0
+                try:
+                    job.result = json.dumps(result_data)
+                except (TypeError, ValueError) as json_error:
+                    logger.warning(
+                        f"Error serializing result data: {json_error}",
+                        extra={'job_id': job_id}
+                    )
+                    job.result = str(result_data)
+                job.completed_at = datetime.utcnow()
+                
+                # Calculate duration
+                if job.started_at:
+                    job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
+                
+                session.commit()
+            except Exception as job_update_error:
+                logger.error(
+                    f"Error updating job completion status: {job_update_error}",
+                    extra={'job_id': job_id, 'account_key': account_key}
+                )
+                session.rollback()
+                # Don't fail the task if job update fails
         
         # Cache result if enabled
         try:
@@ -165,21 +292,45 @@ def scrape_account(self, account_key, mode='real', db_path=None):
         return result_data
         
     except Exception as exc:
-        logger.error(f"Error in scrape_account task for account_key {account_key}: {exc}", exc_info=True)
+        logger.error(
+            f"Error in scrape_account task for account_key {account_key}: {exc}",
+            exc_info=True,
+            extra={
+                'account_key': account_key,
+                'job_id': job_id,
+                'error_type': type(exc).__name__,
+                'mode': mode
+            }
+        )
         
         if session:
             try:
                 session.rollback()
                 # Update job as failed
                 from models.job import Job
-                job = session.query(Job).filter_by(job_id=job_id).first()
-                if job:
-                    job.status = 'failed'
-                    job.error_message = str(exc)
-                    job.completed_at = datetime.utcnow()
-                    session.commit()
-            except Exception as e:
-                logger.error(f"Error updating failed job status: {e}")
+                try:
+                    job = session.query(Job).filter_by(job_id=job_id).first()
+                    if job:
+                        job.status = 'failed'
+                        job.error_message = str(exc)[:500]  # Limit error message length
+                        job.completed_at = datetime.utcnow()
+                        session.commit()
+                except Exception as job_update_error:
+                    logger.error(
+                        f"Error updating failed job status: {job_update_error}",
+                        extra={'job_id': job_id, 'account_key': account_key}
+                    )
+                    session.rollback()
+            except Exception as rollback_error:
+                logger.error(
+                    f"Error during rollback: {rollback_error}",
+                    extra={'job_id': job_id, 'account_key': account_key}
+                )
+        else:
+            logger.warning(
+                f"No session available for rollback",
+                extra={'job_id': job_id, 'account_key': account_key}
+            )
         
         # Intelligent retry with backoff
         if self.request.retries < self.max_retries:

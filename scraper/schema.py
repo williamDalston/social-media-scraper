@@ -131,31 +131,63 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     # Import Job model to register it with Base
     from models.job import Job  # noqa: F401
     
+    # Validate db_path
+    if not db_path or not isinstance(db_path, str) or not db_path.strip():
+        raise ValueError(f"Invalid database path: {db_path!r}. Must be a non-empty string.")
+    
+    db_path = db_path.strip()
+    
     # Check if using SQLite or production database
     is_sqlite = db_path.startswith('sqlite') or (not db_path.startswith('postgresql') and not db_path.startswith('mysql'))
     
     if is_sqlite:
         # SQLite configuration - use NullPool
-        engine = create_engine(
-            f'sqlite:///{db_path}' if not db_path.startswith('sqlite') else db_path,
-            poolclass=NullPool,  # Use NullPool for SQLite
-            connect_args={
-                'check_same_thread': False,  # Allow multi-threaded access
-                'timeout': 20  # Connection timeout in seconds
-            },
-            echo=False  # Set to True for SQL query logging in development
-        )
+        # Construct proper SQLite URL
+        if db_path.startswith('sqlite:///'):
+            sqlite_url = db_path
+        elif db_path.startswith('sqlite://'):
+            # Handle sqlite:// format (should be sqlite:///)
+            sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
+        else:
+            # Relative or absolute file path
+            sqlite_url = f'sqlite:///{db_path}'
+        
+        try:
+            engine = create_engine(
+                sqlite_url,
+                poolclass=NullPool,  # Use NullPool for SQLite
+                connect_args={
+                    'check_same_thread': False,  # Allow multi-threaded access
+                    'timeout': 20  # Connection timeout in seconds
+                },
+                echo=False  # Set to True for SQL query logging in development
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to create SQLite engine with URL '{sqlite_url}': {e}") from e
     else:
         # Production database configuration - use QueuePool with optimization
-        from config.performance_tuning import PerformanceTuner
-        tuner = PerformanceTuner()
-        pool_config = tuner.optimize_database_connections()
+        # Validate that db_path looks like a valid database URL
+        if not (db_path.startswith('postgresql://') or 
+                db_path.startswith('postgresql+psycopg2://') or
+                db_path.startswith('mysql://') or
+                db_path.startswith('mysql+pymysql://')):
+            raise ValueError(
+                f"Invalid database URL format: {db_path!r}. "
+                "Expected format: postgresql://user:pass@host:port/db or mysql://user:pass@host:port/db"
+            )
         
-        engine = create_engine(
-            db_path,
-            poolclass=QueuePool,
-            **pool_config
-        )
+        try:
+            from config.performance_tuning import PerformanceTuner
+            tuner = PerformanceTuner()
+            pool_config = tuner.optimize_database_connections()
+            
+            engine = create_engine(
+                db_path,
+                poolclass=QueuePool,
+                **pool_config
+            )
+        except Exception as e:
+            raise ValueError(f"Failed to create database engine with URL '{db_path}': {e}") from e
     
     # Set up query monitoring if profiling enabled
     if enable_profiling:

@@ -252,37 +252,65 @@ def api_summary():
     session = get_db_session()
     try:
         # Get latest snapshot date - optimized query
-        latest_date = session.query(
-            func.max(FactFollowersSnapshot.snapshot_date)
-        ).scalar()
+        try:
+            latest_date = session.query(
+                func.max(FactFollowersSnapshot.snapshot_date)
+            ).scalar()
+        except Exception as query_error:
+            logger.error(f"Error querying latest snapshot date: {query_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to retrieve summary data")
         
         if not latest_date:
             return jsonify([])
         
         # Optimized query with eager loading to avoid N+1
-        results = session.query(DimAccount, FactFollowersSnapshot).join(
-            FactFollowersSnapshot,
-            DimAccount.account_key == FactFollowersSnapshot.account_key
-        ).filter(
-            FactFollowersSnapshot.snapshot_date == latest_date
-        ).options(
-            joinedload(DimAccount)  # Eager load account data
-        ).all()
+        try:
+            results = session.query(DimAccount, FactFollowersSnapshot).join(
+                FactFollowersSnapshot,
+                DimAccount.account_key == FactFollowersSnapshot.account_key
+            ).filter(
+                FactFollowersSnapshot.snapshot_date == latest_date
+            ).options(
+                joinedload(DimAccount)  # Eager load account data
+            ).all()
+        except Exception as query_error:
+            logger.error(f"Error querying summary data: {query_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to retrieve summary data")
         
         data = []
         for account, snapshot in results:
-            data.append({
-                'platform': account.platform,
-                'handle': account.handle,
-                'org_name': account.org_name or '',
-                'followers': int(snapshot.followers_count or 0),
-                'engagement': int(snapshot.engagements_total or 0),
-                'posts': int(snapshot.posts_count or 0)
-            })
+            try:
+                data.append({
+                    'platform': account.platform or '',
+                    'handle': account.handle or '',
+                    'org_name': account.org_name or '',
+                    'followers': int(snapshot.followers_count or 0),
+                    'engagement': int(snapshot.engagements_total or 0),
+                    'posts': int(snapshot.posts_count or 0)
+                })
+            except (ValueError, TypeError, AttributeError) as data_error:
+                logger.warning(
+                    f"Error processing account data: {data_error}",
+                    extra={'account_key': getattr(account, 'account_key', None)}
+                )
+                # Skip this account but continue processing others
+                continue
         
         return jsonify(data)
+    except Exception as e:
+        logger.exception("Error in api_summary endpoint")
+        from api.errors import InternalServerError
+        if isinstance(e, InternalServerError):
+            raise
+        raise InternalServerError(f"Failed to retrieve summary: {str(e)}")
     finally:
-        session.close()
+        if session:
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(f"Error closing session in api_summary: {close_error}")
 
 @app.route('/api/history/<platform>/<handle>')
 @limiter.limit("100 per minute")
@@ -300,28 +328,54 @@ def api_history(platform, handle):
         # Optimized query with index on platform and handle
         # Use case-insensitive matching to handle any case variations
         # SQLite uses NOCASE collation by default for most operations, but be explicit
-        account = session.query(DimAccount).filter(
-            func.lower(DimAccount.platform) == func.lower(platform),
-            func.lower(DimAccount.handle) == func.lower(handle)
-        ).first()
+        try:
+            account = session.query(DimAccount).filter(
+                func.lower(DimAccount.platform) == func.lower(platform),
+                func.lower(DimAccount.handle) == func.lower(handle)
+            ).first()
+        except Exception as query_error:
+            logger.error(f"Error querying account: {query_error}", extra={'platform': platform, 'handle': handle})
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to retrieve account")
         
         if not account:
-            return jsonify({'error': 'Account not found'}), 404
+            from api.errors import NotFoundError
+            raise NotFoundError('Account', f"{platform}/{handle}")
         
         # Optimized query - use index on account_key
-        history = session.query(FactFollowersSnapshot).filter_by(
-            account_key=account.account_key
-        ).order_by(FactFollowersSnapshot.snapshot_date).all()
+        try:
+            history = session.query(FactFollowersSnapshot).filter_by(
+                account_key=account.account_key
+            ).order_by(FactFollowersSnapshot.snapshot_date).all()
+        except Exception as query_error:
+            logger.error(f"Error querying history: {query_error}", extra={'account_key': account.account_key})
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to retrieve account history")
         
-        data = {
-            'dates': [h.snapshot_date.isoformat() for h in history],
-            'followers': [int(h.followers_count or 0) for h in history],
-            'engagement': [int(h.engagements_total or 0) for h in history]
-        }
+        try:
+            data = {
+                'dates': [h.snapshot_date.isoformat() if h.snapshot_date else '' for h in history],
+                'followers': [int(h.followers_count or 0) for h in history],
+                'engagement': [int(h.engagements_total or 0) for h in history]
+            }
+        except (ValueError, TypeError, AttributeError) as data_error:
+            logger.error(f"Error processing history data: {data_error}", extra={'account_key': account.account_key})
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to process history data")
         
         return jsonify(data)
+    except Exception as e:
+        logger.exception("Error in api_history endpoint", extra={'platform': platform, 'handle': handle})
+        from api.errors import InternalServerError, NotFoundError
+        if isinstance(e, (InternalServerError, NotFoundError)):
+            raise
+        raise InternalServerError(f"Failed to retrieve history: {str(e)}")
     finally:
-        session.close()
+        if session:
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(f"Error closing session in api_history: {close_error}")
 
 @app.route('/api/download')
 @limiter.limit("10 per hour")
@@ -329,47 +383,101 @@ def api_history(platform, handle):
 @track_performance('api_download')
 def download_csv():
     """Download all data as CSV. Not cached as it's a download endpoint."""
-    session = get_db_session()
+    session = None
+    output = None
+    
     try:
+        session = get_db_session()
+        
         # Optimized query with eager loading
-        query = session.query(
-            DimAccount.platform,
-            DimAccount.handle,
-            DimAccount.org_name,
-            FactFollowersSnapshot.snapshot_date,
-            FactFollowersSnapshot.followers_count,
-            FactFollowersSnapshot.engagements_total,
-            FactFollowersSnapshot.posts_count,
-            FactFollowersSnapshot.likes_count,
-            FactFollowersSnapshot.comments_count,
-            FactFollowersSnapshot.shares_count
-        ).join(
-            FactFollowersSnapshot,
-            DimAccount.account_key == FactFollowersSnapshot.account_key
-        ).order_by(
-            FactFollowersSnapshot.snapshot_date.desc(),
-            DimAccount.platform,
-            DimAccount.handle
-        ).all()
+        try:
+            query = session.query(
+                DimAccount.platform,
+                DimAccount.handle,
+                DimAccount.org_name,
+                FactFollowersSnapshot.snapshot_date,
+                FactFollowersSnapshot.followers_count,
+                FactFollowersSnapshot.engagements_total,
+                FactFollowersSnapshot.posts_count,
+                FactFollowersSnapshot.likes_count,
+                FactFollowersSnapshot.comments_count,
+                FactFollowersSnapshot.shares_count
+            ).join(
+                FactFollowersSnapshot,
+                DimAccount.account_key == FactFollowersSnapshot.account_key
+            ).order_by(
+                FactFollowersSnapshot.snapshot_date.desc(),
+                DimAccount.platform,
+                DimAccount.handle
+            ).all()
+        except Exception as query_error:
+            logger.error(f"Error querying data for CSV download: {query_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to retrieve data for download")
         
         # Convert to CSV
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(['Platform', 'Handle', 'Organization', 'Date', 'Followers', 'Engagement Total', 'Posts', 'Likes', 'Comments', 'Shares'])
+        try:
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(['Platform', 'Handle', 'Organization', 'Date', 'Followers', 'Engagement Total', 'Posts', 'Likes', 'Comments', 'Shares'])
+            
+            for row in query:
+                try:
+                    # Safely convert row data
+                    safe_row = [
+                        str(row.platform) if row.platform else '',
+                        str(row.handle) if row.handle else '',
+                        str(row.org_name) if row.org_name else '',
+                        row.snapshot_date.isoformat() if row.snapshot_date else '',
+                        int(row.followers_count or 0),
+                        int(row.engagements_total or 0),
+                        int(row.posts_count or 0),
+                        int(row.likes_count or 0),
+                        int(row.comments_count or 0),
+                        int(row.shares_count or 0)
+                    ]
+                    writer.writerow(safe_row)
+                except (ValueError, TypeError, AttributeError) as row_error:
+                    logger.warning(f"Error processing row for CSV: {row_error}")
+                    # Skip this row but continue
+                    continue
+            
+            output.seek(0)
+        except Exception as csv_error:
+            logger.error(f"Error creating CSV: {csv_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to generate CSV file")
         
-        for row in query:
-            writer.writerow(row)
-        
-        output.seek(0)
+        try:
+            csv_bytes = output.getvalue().encode('utf-8')
+        except UnicodeEncodeError as encode_error:
+            logger.error(f"Error encoding CSV: {encode_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to encode CSV file")
         
         return send_file(
-            io.BytesIO(output.getvalue().encode('utf-8')),
+            io.BytesIO(csv_bytes),
             mimetype='text/csv',
             as_attachment=True,
             download_name='hhs_social_media_data.csv'
         )
+    except Exception as e:
+        logger.exception("Error in download_csv endpoint")
+        from api.errors import InternalServerError, APIError
+        if isinstance(e, APIError):
+            raise
+        raise InternalServerError(f"Failed to generate download: {str(e)}")
     finally:
-        session.close()
+        if output:
+            try:
+                output.close()
+            except Exception:
+                pass
+        if session:
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(f"Error closing session in download_csv: {close_error}")
 
 @app.route('/api/grid')
 @limiter.limit("100 per minute")
@@ -378,58 +486,93 @@ def download_csv():
 @track_performance('api_grid')
 def api_grid():
     """Get grid data with pagination. Cached for 5 minutes."""
-    session = get_db_session()
+    session = None
+    
     try:
-        # Pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 50, type=int)
+        # Pagination parameters with validation
+        try:
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 50, type=int)
+            
+            # Validate pagination parameters
+            if page < 1:
+                page = 1
+            if per_page < 1:
+                per_page = 50
+            
+            # Limit per_page to prevent abuse
+            per_page = min(per_page, 1000)
+            per_page = max(per_page, 1)
+        except (ValueError, TypeError) as param_error:
+            logger.warning(f"Invalid pagination parameters: {param_error}")
+            page = 1
+            per_page = 50
         
-        # Limit per_page to prevent abuse
-        per_page = min(per_page, 1000)
-        per_page = max(per_page, 1)
+        session = get_db_session()
         
         # Base query
-        base_query = session.query(
-            DimAccount.platform,
-            DimAccount.handle,
-            DimAccount.org_name,
-            FactFollowersSnapshot.snapshot_date,
-            FactFollowersSnapshot.followers_count,
-            FactFollowersSnapshot.engagements_total,
-            FactFollowersSnapshot.posts_count,
-            FactFollowersSnapshot.likes_count,
-            FactFollowersSnapshot.comments_count,
-            FactFollowersSnapshot.shares_count
-        ).join(
-            FactFollowersSnapshot,
-            DimAccount.account_key == FactFollowersSnapshot.account_key
-        ).order_by(
-            FactFollowersSnapshot.snapshot_date.desc(),
-            DimAccount.platform,
-            DimAccount.handle
-        )
+        try:
+            base_query = session.query(
+                DimAccount.platform,
+                DimAccount.handle,
+                DimAccount.org_name,
+                FactFollowersSnapshot.snapshot_date,
+                FactFollowersSnapshot.followers_count,
+                FactFollowersSnapshot.engagements_total,
+                FactFollowersSnapshot.posts_count,
+                FactFollowersSnapshot.likes_count,
+                FactFollowersSnapshot.comments_count,
+                FactFollowersSnapshot.shares_count
+            ).join(
+                FactFollowersSnapshot,
+                DimAccount.account_key == FactFollowersSnapshot.account_key
+            ).order_by(
+                FactFollowersSnapshot.snapshot_date.desc(),
+                DimAccount.platform,
+                DimAccount.handle
+            )
+        except Exception as query_error:
+            logger.error(f"Error building grid query: {query_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to build query")
         
         # Get total count
-        total = base_query.count()
+        try:
+            total = base_query.count()
+        except Exception as count_error:
+            logger.error(f"Error counting grid results: {count_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to count results")
         
         # Apply pagination
-        paginated_query = base_query.offset((page - 1) * per_page).limit(per_page)
-        results = paginated_query.all()
+        try:
+            paginated_query = base_query.offset((page - 1) * per_page).limit(per_page)
+            results = paginated_query.all()
+        except Exception as pagination_error:
+            logger.error(f"Error applying pagination: {pagination_error}")
+            from api.errors import InternalServerError
+            raise InternalServerError("Failed to paginate results")
         
+        # Process results
         data = []
         for row in results:
-            data.append([
-                row.platform or '',
-                row.handle or '',
-                row.org_name or '',
-                row.snapshot_date.isoformat() if row.snapshot_date else '',
-                int(row.followers_count or 0),
-                int(row.engagements_total or 0),
-                int(row.posts_count or 0),
-                int(row.likes_count or 0),
-                int(row.comments_count or 0),
-                int(row.shares_count or 0)
-            ])
+            try:
+                data.append([
+                    str(row.platform) if row.platform else '',
+                    str(row.handle) if row.handle else '',
+                    str(row.org_name) if row.org_name else '',
+                    row.snapshot_date.isoformat() if row.snapshot_date else '',
+                    int(row.followers_count or 0),
+                    int(row.engagements_total or 0),
+                    int(row.posts_count or 0),
+                    int(row.likes_count or 0),
+                    int(row.comments_count or 0),
+                    int(row.shares_count or 0)
+                ])
+            except (ValueError, TypeError, AttributeError) as row_error:
+                logger.warning(f"Error processing grid row: {row_error}")
+                # Skip this row but continue
+                continue
         
         return jsonify({
             'data': data,
@@ -440,76 +583,171 @@ def api_grid():
                 'pages': (total + per_page - 1) // per_page if total > 0 else 0
             }
         })
+    except Exception as e:
+        logger.exception("Error in api_grid endpoint")
+        from api.errors import InternalServerError, APIError
+        if isinstance(e, APIError):
+            raise
+        raise InternalServerError(f"Failed to retrieve grid data: {str(e)}")
     finally:
-        session.close()
+        if session:
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(f"Error closing session in api_grid: {close_error}")
 
 def process_csv_data(csv_data, user=None):
     """Process CSV data (from file or text) and add accounts."""
-    # Validate CSV file (type, size, content)
-    if isinstance(csv_data, bytes):
-        csv_bytes = csv_data
-    else:
-        csv_bytes = csv_data.encode('utf-8')
+    session = None
     
-    is_valid, error_message, validated_rows = validate_csv_file(csv_bytes, max_size_mb=10)
-    
-    if not is_valid:
-        return None, error_message, 0
-    
-    # Process validated rows
-    session = get_db_session()
     try:
+        # Validate input
+        if not csv_data:
+            return None, "No CSV data provided", 0
+        
+        # Validate CSV file (type, size, content)
+        try:
+            if isinstance(csv_data, bytes):
+                csv_bytes = csv_data
+            else:
+                csv_bytes = csv_data.encode('utf-8')
+        except (UnicodeEncodeError, AttributeError) as encode_error:
+            return None, f"Error encoding CSV data: {encode_error}", 0
+        
+        try:
+            is_valid, error_message, validated_rows = validate_csv_file(csv_bytes, max_size_mb=10)
+        except Exception as validation_error:
+            logger.error(f"Error validating CSV file: {validation_error}")
+            return None, f"Error validating CSV file: {validation_error}", 0
+        
+        if not is_valid:
+            return None, error_message or "CSV validation failed", 0
+        
+        if not validated_rows:
+            return None, "No valid rows found in CSV", 0
+        
+        # Process validated rows
+        session = get_db_session()
         count = 0
-        for row in validated_rows:
-            platform = row['Platform']
-            handle = row['Handle']
-            org = row.get('Organization', '')
+        errors = []
+        
+        try:
+            for row_num, row in enumerate(validated_rows, start=1):
+                try:
+                    platform = row.get('Platform', '').strip()
+                    handle = row.get('Handle', '').strip()
+                    org = row.get('Organization', '').strip()
+                    
+                    # Validate required fields
+                    if not platform:
+                        errors.append(f"Row {row_num}: Missing Platform")
+                        continue
+                    if not handle:
+                        errors.append(f"Row {row_num}: Missing Handle")
+                        continue
+                    
+                    # Sanitize organization name
+                    try:
+                        org = sanitize_string(org, 255)
+                    except Exception as sanitize_error:
+                        logger.warning(f"Error sanitizing org name for row {row_num}: {sanitize_error}")
+                        org = org[:255] if org else ''
+                    
+                    # Check if exists - optimized query with case-insensitive matching
+                    try:
+                        existing = session.query(DimAccount).filter(
+                            func.lower(DimAccount.platform) == func.lower(platform),
+                            func.lower(DimAccount.handle) == func.lower(handle)
+                        ).first()
+                    except Exception as query_error:
+                        logger.error(f"Error querying existing account: {query_error}", extra={'row_num': row_num})
+                        errors.append(f"Row {row_num}: Database query error")
+                        continue
+                    
+                    if not existing:
+                        try:
+                            account = DimAccount(
+                                platform=platform,
+                                handle=handle,
+                                org_name=org,
+                                account_display_name=f"{org} on {platform}" if org else f"{handle} on {platform}",
+                                account_url=f"https://{platform.lower()}.com/{handle}",
+                                is_active=True
+                            )
+                            session.add(account)
+                            count += 1
+                        except Exception as create_error:
+                            logger.error(f"Error creating account: {create_error}", extra={'row_num': row_num})
+                            errors.append(f"Row {row_num}: Error creating account")
+                            continue
+                except Exception as row_error:
+                    logger.error(f"Error processing row {row_num}: {row_error}")
+                    errors.append(f"Row {row_num}: {str(row_error)}")
+                    continue
             
-            # Sanitize organization name
-            org = sanitize_string(org, 255)
+            # Commit all changes
+            try:
+                session.commit()
+            except Exception as commit_error:
+                logger.error(f"Error committing CSV data: {commit_error}")
+                session.rollback()
+                return None, f"Error saving accounts to database: {commit_error}", count
             
-            # Check if exists - optimized query with case-insensitive matching
-            existing = session.query(DimAccount).filter(
-                func.lower(DimAccount.platform) == func.lower(platform),
-                func.lower(DimAccount.handle) == func.lower(handle)
-            ).first()
-            if not existing:
-                account = DimAccount(
-                    platform=platform,
-                    handle=handle,
-                    org_name=org,
-                    account_display_name=f"{org} on {platform}" if org else f"{handle} on {platform}",
-                    account_url=f"https://{platform.lower()}.com/{handle}",
-                    is_active=True
-                )
-                session.add(account)
-                count += 1
-        
-        session.commit()
-        
-        # Invalidate relevant caches
-        invalidate_summary_cache()
-        invalidate_grid_cache()
-        invalidate_accounts_list_cache()
-        
-        # Log file upload
-        if user:
-            log_security_event(
-                AuditEventType.FILE_UPLOAD,
-                user_id=user.id,
-                username=user.username,
-                resource_type='csv',
-                action='upload',
-                details={'accounts_added': count},
-                success=True
-            )
-        
-        return True, None, count
+            # Invalidate relevant caches
+            try:
+                invalidate_summary_cache()
+                invalidate_grid_cache()
+                invalidate_accounts_list_cache()
+            except Exception as cache_error:
+                logger.warning(f"Error invalidating caches: {cache_error}")
+                # Don't fail if cache invalidation fails
+            
+            # Log file upload
+            if user:
+                try:
+                    log_security_event(
+                        AuditEventType.FILE_UPLOAD,
+                        user_id=user.id,
+                        username=user.username,
+                        resource_type='csv',
+                        action='upload',
+                        details={'accounts_added': count, 'errors': len(errors)},
+                        success=True
+                    )
+                except Exception as audit_error:
+                    logger.warning(f"Error logging security event: {audit_error}")
+                    # Don't fail if audit logging fails
+            
+            # Return success with any errors as warnings
+            if errors:
+                error_message = f"Processed {count} accounts with {len(errors)} errors: {'; '.join(errors[:5])}"
+                return True, error_message, count
+            
+            return True, None, count
+            
+        except Exception as process_error:
+            logger.exception("Error processing CSV rows")
+            if session:
+                try:
+                    session.rollback()
+                except Exception as rollback_error:
+                    logger.error(f"Error during rollback: {rollback_error}")
+            return None, f"Error processing CSV data: {process_error}", count
+            
     except Exception as e:
-        session.rollback()
-        return None, str(e), 0
+        logger.exception("Unexpected error in process_csv_data")
+        if session:
+            try:
+                session.rollback()
+            except Exception:
+                pass
+        return None, f"Unexpected error: {str(e)}", 0
     finally:
-        session.close()
+        if session:
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(f"Error closing session in process_csv_data: {close_error}")
 
 @app.route('/upload', methods=['POST'])
 @limiter.limit("10 per hour")
@@ -1327,7 +1565,7 @@ def add_blacklist_ip():
     else:
         return jsonify({'error': 'Invalid IP address or CIDR range'}), 400
 
-# Error handlers for security
+# Error handlers for security and API errors
 @app.errorhandler(429)
 def ratelimit_handler(e):
     return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
@@ -1339,6 +1577,36 @@ def unauthorized_handler(e):
 @app.errorhandler(403)
 def forbidden_handler(e):
     return jsonify({'error': 'Insufficient permissions'}), 403
+
+# Global error handler for API errors
+@app.errorhandler(Exception)
+def global_error_handler(error):
+    """Global error handler for unhandled exceptions."""
+    from api.errors import APIError
+    
+    # If it's already an APIError, use its status code and message
+    if isinstance(error, APIError):
+        response = error.to_dict()
+        return jsonify(response), error.status_code
+    
+    # Log the error with full context
+    logger.exception(
+        "Unhandled exception in application",
+        extra={
+            'error_type': type(error).__name__,
+            'error_message': str(error),
+            'path': request.path if request else None,
+            'method': request.method if request else None
+        }
+    )
+    
+    # Return generic error message (don't expose internal details)
+    return jsonify({
+        'error': {
+            'code': 'INTERNAL_SERVER_ERROR',
+            'message': 'An internal server error occurred. Please try again later.'
+        }
+    }), 500
 
 if __name__ == '__main__':
     # Initialize database and create all tables (including User table)

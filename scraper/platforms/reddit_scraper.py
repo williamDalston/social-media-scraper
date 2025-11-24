@@ -4,12 +4,12 @@ Reddit scraper using web scraping and Reddit API.
 
 import re
 import logging
-import requests
 from typing import Dict, Any, Optional
 
 from .base_platform import BasePlatformScraper
-from ..utils.errors import AccountNotFoundError, ScraperError
+from ..utils.errors import AccountNotFoundError, ScraperError, RateLimitError, NetworkError, PrivateAccountError
 from ..utils.parsers import parse_follower_count
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -79,28 +79,55 @@ class RedditScraper(BasePlatformScraper):
         proxy = self._get_proxy()
         
         try:
+            # Validate URL before making request
+            if not normalized_url or not isinstance(normalized_url, str):
+                raise ScraperError(f"Invalid URL: {normalized_url}")
+            
             # Reddit requires User-Agent header
             headers = {
                 **self.headers,
                 'User-Agent': 'Mozilla/5.0 (compatible; SocialMediaScraper/1.0)',
             }
             
-            response = requests.get(
-                normalized_url,
-                headers=headers,
-                timeout=self.timeout,
-                proxies=proxy,
-                allow_redirects=True,
-            )
+            try:
+                response = requests.get(
+                    normalized_url,
+                    headers=headers,
+                    timeout=self.timeout,
+                    proxies=proxy,
+                    allow_redirects=True,
+                )
+            except requests.exceptions.Timeout:
+                raise NetworkError(f"Request timeout while fetching Reddit page: {normalized_url}")
+            except requests.exceptions.ConnectionError as conn_error:
+                raise NetworkError(f"Connection error while fetching Reddit page: {conn_error}")
+            except requests.exceptions.RequestException as req_error:
+                raise ScraperError(f"Request error while fetching Reddit page: {req_error}")
             
             if response.status_code == 404:
                 raise AccountNotFoundError(f"Reddit subreddit not found: {normalized_url}")
             
+            if response.status_code == 429:
+                raise RateLimitError(f"Rate limit exceeded for Reddit: {normalized_url}")
+            
+            if response.status_code in (401, 403):
+                raise PrivateAccountError(f"Reddit subreddit is private or unauthorized: {normalized_url}")
+            
             if response.status_code != 200:
-                raise ScraperError(f"Failed to fetch Reddit page: {response.status_code}")
+                raise ScraperError(f"Failed to fetch Reddit page: HTTP {response.status_code}")
             
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Validate response content
+            if not response.text:
+                logger.warning(f"Empty response from Reddit: {normalized_url}")
+                raise ScraperError("Empty response from Reddit")
+            
+            try:
+                soup = BeautifulSoup(response.text, 'html.parser')
+            except Exception as parse_error:
+                logger.error(f"Error parsing HTML: {parse_error}", extra={'url': normalized_url})
+                raise ScraperError(f"Failed to parse Reddit page: {parse_error}")
             
             subscribers = 0
             active_users = 0
@@ -108,7 +135,12 @@ class RedditScraper(BasePlatformScraper):
             
             # Reddit embeds data in various places
             # Look for subscriber count in meta tags
-            meta_tags = soup.find_all('meta')
+            try:
+                meta_tags = soup.find_all('meta')
+            except Exception as find_error:
+                logger.warning(f"Error finding meta tags: {find_error}", extra={'url': normalized_url})
+                meta_tags = []
+            
             for tag in meta_tags:
                 name = tag.get('name', '') or tag.get('property', '')
                 content = tag.get('content', '')

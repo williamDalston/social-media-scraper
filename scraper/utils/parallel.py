@@ -135,40 +135,76 @@ def scrape_account_parallel(
         data = scraper.scrape(account)
         
         if data:
+            # Validate scraped data before processing
+            if not isinstance(data, dict):
+                raise ValueError(f"Scraped data must be a dictionary, got {type(data).__name__}")
+            
             # Update account metadata from scraped data
-            from scraper.utils.metrics_calculator import update_account_metadata
-            update_account_metadata(account, data)
+            try:
+                from scraper.utils.metrics_calculator import update_account_metadata
+                update_account_metadata(account, data)
+            except Exception as metadata_error:
+                logger.warning(
+                    f"Error updating account metadata for {account.platform}/{account.handle}: {metadata_error}",
+                    extra={'account_key': account.account_key}
+                )
+                # Continue even if metadata update fails
             
             # Create snapshot
             from scraper.schema import FactFollowersSnapshot
-            snapshot = FactFollowersSnapshot(
-                account_key=account.account_key,
-                snapshot_date=today,
-                followers_count=data.get('followers_count', 0),
-                following_count=data.get('following_count', 0),
-                posts_count=data.get('posts_count', 0),
-                likes_count=data.get('likes_count', 0),
-                comments_count=data.get('comments_count', 0),
-                shares_count=data.get('shares_count', 0),
-                subscribers_count=data.get('subscribers_count', 0),  # For YouTube
-                video_views=data.get('views_count', 0),  # For YouTube
-                engagements_total=0,
-                videos_count=data.get('videos_count', 0)  # For YouTube
-            )
-            snapshot.engagements_total = (
-                snapshot.likes_count + 
-                snapshot.comments_count + 
-                snapshot.shares_count
-            )
-            
-            # Calculate additional metrics
-            from scraper.utils.metrics_calculator import calculate_snapshot_metrics
-            calculate_snapshot_metrics(snapshot, session, account, data)
-            
-            session.add(snapshot)
-            # Use batch commits for better performance (commit every 10 accounts or at end)
-            # For now, commit immediately but this could be optimized further
-            session.commit()
+            try:
+                snapshot = FactFollowersSnapshot(
+                    account_key=account.account_key,
+                    snapshot_date=today,
+                    followers_count=int(data.get('followers_count', 0) or 0),
+                    following_count=int(data.get('following_count', 0) or 0),
+                    posts_count=int(data.get('posts_count', 0) or 0),
+                    likes_count=int(data.get('likes_count', 0) or 0),
+                    comments_count=int(data.get('comments_count', 0) or 0),
+                    shares_count=int(data.get('shares_count', 0) or 0),
+                    subscribers_count=int(data.get('subscribers_count', 0) or 0),  # For YouTube
+                    video_views=int(data.get('views_count', 0) or 0),  # For YouTube
+                    engagements_total=0,
+                    videos_count=int(data.get('videos_count', 0) or 0)  # For YouTube
+                )
+                snapshot.engagements_total = (
+                    snapshot.likes_count + 
+                    snapshot.comments_count + 
+                    snapshot.shares_count
+                )
+                
+                # Calculate additional metrics
+                try:
+                    from scraper.utils.metrics_calculator import calculate_snapshot_metrics
+                    calculate_snapshot_metrics(snapshot, session, account, data)
+                except Exception as metrics_error:
+                    logger.warning(
+                        f"Error calculating metrics for {account.platform}/{account.handle}: {metrics_error}",
+                        extra={'account_key': account.account_key}
+                    )
+                    # Continue even if metrics calculation fails
+                
+                session.add(snapshot)
+                # Use batch commits for better performance (commit every 10 accounts or at end)
+                # For now, commit immediately but this could be optimized further
+                session.commit()
+            except (ValueError, TypeError) as validation_error:
+                logger.error(
+                    f"Data validation error for {account.platform}/{account.handle}: {validation_error}",
+                    extra={
+                        'account_key': account.account_key,
+                        'data_keys': list(data.keys()) if isinstance(data, dict) else None
+                    }
+                )
+                session.rollback()
+                raise ValueError(f"Invalid scraped data format: {validation_error}")
+            except Exception as db_error:
+                logger.error(
+                    f"Database error saving snapshot for {account.platform}/{account.handle}: {db_error}",
+                    extra={'account_key': account.account_key}
+                )
+                session.rollback()
+                raise
             
             duration = time.time() - start_time
             logger.debug(
@@ -195,14 +231,30 @@ def scrape_account_parallel(
             extra={
                 'account_key': account.account_key,
                 'error': str(e),
+                'error_type': type(e).__name__,
                 'duration': round(duration, 3)
             }
         )
+        # Rollback any pending database changes
+        if session:
+            try:
+                session.rollback()
+            except Exception as rollback_error:
+                logger.error(
+                    f"Error during rollback for {account.platform}/{account.handle}: {rollback_error}",
+                    extra={'account_key': account.account_key}
+                )
         return None, e
         
     finally:
         if session:
-            session.close()
+            try:
+                session.close()
+            except Exception as close_error:
+                logger.error(
+                    f"Error closing session for {account.platform}/{account.handle}: {close_error}",
+                    extra={'account_key': account.account_key}
+                )
 
 
 def scrape_accounts_parallel(
@@ -304,7 +356,11 @@ def scrape_accounts_parallel(
             except Exception as e:
                 logger.exception(
                     f"Unexpected error processing {account.platform}/{account.handle}",
-                    extra={'account_key': account.account_key, 'error': str(e)}
+                    extra={
+                        'account_key': account.account_key,
+                        'error': str(e),
+                        'error_type': type(e).__name__
+                    }
                 )
                 metrics.record_error(account.account_key, account.platform)
                 processed_count += 1

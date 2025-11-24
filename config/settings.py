@@ -21,7 +21,7 @@ class Config:
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
     
     # Database
-    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///social_media.db')
+    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///social_media.db') or 'sqlite:///social_media.db'
     
     @classmethod
     def get_db_path(cls) -> Optional[str]:
@@ -30,10 +30,14 @@ class Config:
         Returns None if not SQLite or if path cannot be extracted.
         """
         try:
-            parsed = urlparse(cls.DATABASE_URL)
+            if not cls.DATABASE_URL or not cls.DATABASE_URL.strip():
+                return None
+            parsed = urlparse(cls.DATABASE_URL.strip())
             if parsed.scheme == 'sqlite':
                 # SQLite URLs can be: sqlite:///path or sqlite:///absolute/path
                 path = parsed.path
+                if not path:
+                    return None
                 if path.startswith('/'):
                     return path
                 # Handle relative paths
@@ -123,13 +127,27 @@ class Config:
         Returns (is_connected, error_message)
         """
         try:
+            # Validate DATABASE_URL before using it
+            if not cls.DATABASE_URL or not isinstance(cls.DATABASE_URL, str) or not cls.DATABASE_URL.strip():
+                return False, f"Invalid DATABASE_URL: {cls.DATABASE_URL!r}. Must be a non-empty string."
+            
+            db_url = cls.DATABASE_URL.strip()
+            
+            # Validate URL format
+            try:
+                parsed = urlparse(db_url)
+                if not parsed.scheme:
+                    return False, f"DATABASE_URL must have a valid scheme (sqlite://, postgresql://, etc.), got: {db_url!r}"
+            except Exception as e:
+                return False, f"Failed to parse DATABASE_URL: {e}"
+            
             from sqlalchemy import create_engine, text
-            engine = create_engine(cls.DATABASE_URL)
+            engine = create_engine(db_url)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             return True, None
         except Exception as e:
-            return False, str(e)
+            return False, f"Database connection failed: {str(e)}"
     
     @classmethod
     def test_redis_connection(cls) -> tuple[bool, Optional[str]]:
