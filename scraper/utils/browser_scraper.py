@@ -190,8 +190,7 @@ def scrape_with_browser(
             elif driver_type == "playwright":
                 page = browser.new_page()
                 page.goto(url, wait_until="networkidle", timeout=30000)
-                import time
-
+                # time module is already imported at module level
                 time.sleep(wait_time)
                 content = page.content()
                 page.close()
