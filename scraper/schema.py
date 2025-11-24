@@ -131,29 +131,123 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     Raises:
         ValueError: If db_path is invalid or cannot be parsed
     """
-    import os
+    # ============================================================================
+    # ULTIMATE FIRST CHECK - This MUST be the very first thing that happens
+    # ============================================================================
+    # Convert to string and check for .db extension BEFORE any imports
+    # This prevents ANY possibility of the path being misidentified
     import sys
+    import os
+    
+    # Force stderr output immediately
+    sys.stderr.write(f"[INIT_DB] Function called with db_path='{db_path}' (type: {type(db_path).__name__})\n")
+    sys.stderr.flush()
+    
+    # Convert to string safely
+    try:
+        db_path_str = str(db_path).strip() if db_path else ''
+    except Exception as conv_error:
+        sys.stderr.write(f"[INIT_DB] Error converting db_path to string: {conv_error}\n")
+        sys.stderr.flush()
+        db_path_str = ''
+    
+    # SIMPLEST POSSIBLE CHECK - just look for .db at the end (case insensitive)
+    is_db_file = False
+    if db_path_str:
+        db_lower = db_path_str.lower()
+        is_db_file = db_lower.endswith('.db')
+        sys.stderr.write(f"[INIT_DB] Checking .db: db_path_str='{db_path_str}', is_db_file={is_db_file}\n")
+        sys.stderr.flush()
+    
+    if is_db_file:
+        # This is a .db file - handle as SQLite immediately
+        sys.stderr.write(f"[INIT_DB ULTIMATE] DETECTED .db FILE: '{db_path_str}' - Handling as SQLite\n")
+        sys.stderr.flush()
+        
+        # Now import what we need
+        from sqlalchemy import create_engine
+        from sqlalchemy.pool import NullPool
+        
+        # Construct SQLite URL
+        if db_path_str.startswith('sqlite:///'):
+            sqlite_url = db_path_str
+        elif db_path_str.startswith('sqlite://'):
+            sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
+        else:
+            # Make absolute and normalize
+            try:
+                abs_path = os.path.abspath(db_path_str) if not os.path.isabs(db_path_str) else db_path_str
+                normalized = abs_path.replace('\\', '/').replace('//', '/')
+                sqlite_url = f'sqlite:///{normalized}'
+            except Exception:
+                sqlite_url = f'sqlite:///{db_path_str.replace(os.sep, "/")}'
+        
+        sys.stderr.write(f"[INIT_DB ULTIMATE] SQLite URL: '{sqlite_url}'\n")
+        sys.stderr.flush()
+        
+        # Validate
+        if not sqlite_url.startswith('sqlite:///'):
+            if sqlite_url.startswith('sqlite://'):
+                sqlite_url = sqlite_url.replace('sqlite://', 'sqlite:///', 1)
+            else:
+                sqlite_url = f'sqlite:///{sqlite_url}'
+        
+        sys.stderr.write(f"[INIT_DB ULTIMATE] Final SQLite URL: '{sqlite_url}'\n")
+        sys.stderr.flush()
+        
+        # Create engine
+        try:
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Calling create_engine...\n")
+            sys.stderr.flush()
+            engine = create_engine(
+                sqlite_url,
+                poolclass=NullPool,
+                connect_args={'check_same_thread': False, 'timeout': 20},
+                echo=False
+            )
+            sys.stderr.write(f"[INIT_DB ULTIMATE] create_engine SUCCESS!\n")
+            sys.stderr.flush()
+            
+            # Import Job model
+            from models.job import Job  # noqa: F401
+            
+            # Initialize
+            if enable_profiling:
+                try:
+                    from config.database_performance import setup_query_monitoring
+                    setup_query_monitoring(engine)
+                except Exception:
+                    pass
+                try:
+                    from scraper.utils.query_profiler import setup_query_listening
+                    setup_query_listening(engine)
+                except Exception:
+                    pass
+            
+            Base.metadata.create_all(engine)
+            _ensure_indexes(engine, db_path_str)
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Complete initialization SUCCESS!\n")
+            sys.stderr.flush()
+            return engine
+        except Exception as e:
+            sys.stderr.write(f"[INIT_DB ULTIMATE] ERROR in create_engine: {e}\n")
+            sys.stderr.flush()
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            raise ValueError(f"Failed to create SQLite engine (ultimate check) with URL '{sqlite_url}': {e}") from e
+    
+    # If we get here, it's not a .db file - continue with normal logic
+    sys.stderr.write(f"[INIT_DB] Not a .db file, continuing with normal detection\n")
+    sys.stderr.flush()
+    
+    # Now do normal imports and processing
     from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool, QueuePool
     import logging
     
     logger = logging.getLogger(__name__)
     
-    # ABSOLUTE FIRST CHECK: If it's 'social_media.db' or ends in .db, handle immediately
-    # This check happens BEFORE any other logic, imports, or validation
-    # This is the ultimate safety net
-    # Use the simplest possible check to ensure it always works
-    try:
-        db_path_str = str(db_path).strip() if db_path else ''
-    except Exception:
-        db_path_str = ''
-    
-    # SIMPLEST POSSIBLE CHECK - just look for .db at the end
-    is_db_file_simple = False
-    if db_path_str:
-        is_db_file_simple = db_path_str.endswith('.db') or db_path_str.endswith('.DB')
-    
-    if is_db_file_simple:
+    # Continue with normalization and other logic for non-.db files
         print(f"[INIT_DB ULTIMATE CHECK] Detected .db file at START: '{db_path_str}'", file=sys.stderr, flush=True)
         # Construct SQLite URL immediately
         if db_path_str.startswith('sqlite:///'):
