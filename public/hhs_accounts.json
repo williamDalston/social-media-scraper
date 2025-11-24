@@ -1,0 +1,497 @@
+[
+  {
+    "organization": "HHS",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HHS"
+  },
+  {
+    "organization": "HHS",
+    "platform": "Flickr",
+    "url": "https://www.flickr.com/photos/hhsgov/"
+  },
+  {
+    "organization": "HHS",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/hhsgov"
+  },
+  {
+    "organization": "HHS",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/company/us-department-of-health-and-human-services"
+  },
+  {
+    "organization": "HHS",
+    "platform": "X",
+    "url": "https://x.com/HHSGov"
+  },
+  {
+    "organization": "HHS",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/USGOVHHS"
+  },
+  {
+    "organization": "Secretary Kennedy",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/SecKennedy"
+  },
+  {
+    "organization": "Secretary Kennedy",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/seckennedy/"
+  },
+  {
+    "organization": "Secretary Kennedy",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/secretarykennedy/"
+  },
+  {
+    "organization": "Secretary Kennedy",
+    "platform": "Truth Social",
+    "url": "https://www.truthsocial.com/@seckennedy"
+  },
+  {
+    "organization": "Secretary Kennedy",
+    "platform": "X",
+    "url": "https://x.com/SecKennedy"
+  },
+  {
+    "organization": "President’s Council on Sports Nutrition and Fitness",
+    "platform": "X",
+    "url": "https://x.com/FitnessGov"
+  },
+  {
+    "organization": "Recovery Month",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/RecoveryMonth"
+  },
+  {
+    "organization": "Recovery Month",
+    "platform": "X",
+    "url": "https://x.com/RecoveryMonth"
+  },
+  {
+    "organization": "Recovery Month",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/recoverymonth"
+  },
+  {
+    "organization": "U.S. Public Health Service Commissioned Corps",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/USPHS/"
+  },
+  {
+    "organization": "U.S. Public Health Service Commissioned Corps",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/company/commissioned-corps-of-the-u-s-public-health-service/"
+  },
+  {
+    "organization": "U.S. Public Health Service Commissioned Corps",
+    "platform": "X",
+    "url": "https://x.com/usphscc"
+  },
+  {
+    "organization": "We Think Twice",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/WeThink2"
+  },
+  {
+    "organization": "We Think Twice",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/wethinktwice/"
+  },
+  {
+    "organization": "HHS Region 1",
+    "platform": "X",
+    "url": "https://x.com/hhsregionone"
+  },
+  {
+    "organization": "HHS Region 2",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion2"
+  },
+  {
+    "organization": "HHS Region 3",
+    "platform": "X",
+    "url": "https://x.com/hhsregion3"
+  },
+  {
+    "organization": "HHS Region 4",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion4"
+  },
+  {
+    "organization": "HHS Region 5",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion5"
+  },
+  {
+    "organization": "HHS Region 6",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion6"
+  },
+  {
+    "organization": "HHS Region 7",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion7"
+  },
+  {
+    "organization": "HHS Region 8",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion8"
+  },
+  {
+    "organization": "HHS Region 9",
+    "platform": "X",
+    "url": "https://x.com/HHSRegion9"
+  },
+  {
+    "organization": "HHS Region 10",
+    "platform": "X",
+    "url": "https://x.com/HHS_Region_10"
+  },
+  {
+    "organization": "HHS/OCIO Cybersecurity",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/in/hhscybersecurity/"
+  },
+  {
+    "organization": "HHS/OCIO Cybersecurity",
+    "platform": "X",
+    "url": "https://x.com/SecureOneHHS"
+  },
+  {
+    "organization": "HHS Office of Disease Prevention and Health Promotion",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HHSHealthGov"
+  },
+  {
+    "organization": "HHS Office of Disease Prevention and Health Promotion",
+    "platform": "X",
+    "url": "https://x.com/HealthGov"
+  },
+  {
+    "organization": "HHS Office of Disease Prevention and Health Promotion",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/ODPHP"
+  },
+  {
+    "organization": "HHS Office of Minority Health",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/minorityhealth"
+  },
+  {
+    "organization": "HHS Office of Minority Health",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/minorityhealth"
+  },
+  {
+    "organization": "HHS Office of Minority Health",
+    "platform": "X",
+    "url": "https://x.com/MinorityHealth"
+  },
+  {
+    "organization": "HHS Office of Minority Health",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/OfficeMinorityHealth"
+  },
+  {
+    "organization": "HHS Office of Population Affairs",
+    "platform": "X",
+    "url": "https://x.com/HHSPopAffairs"
+  },
+  {
+    "organization": "HHS Office of Population Affairs",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/c/HHSOfficeofPopulationAffairs"
+  },
+  {
+    "organization": "HHS Office of Research Integrity",
+    "platform": "X",
+    "url": "https://x.com/hhs_ori"
+  },
+  {
+    "organization": "HHS Office of Women’s Health",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HHSOWH"
+  },
+  {
+    "organization": "HHS Office of Women’s Health",
+    "platform": "X",
+    "url": "https://x.com/womenshealth"
+  },
+  {
+    "organization": "HHS Office of Women’s Health",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/womenshealthgov"
+  },
+  {
+    "organization": "Insure Kids Now (IKN)",
+    "platform": "X",
+    "url": "https://x.com/IKNGov"
+  },
+  {
+    "organization": "Medicaid.gov",
+    "platform": "X",
+    "url": "https://x.com/MedicaidGov"
+  },
+  {
+    "organization": "Medicare.gov",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/medicare/"
+  },
+  {
+    "organization": "Medicare.gov",
+    "platform": "X",
+    "url": "https://x.com/MedicareGovv"
+  },
+  {
+    "organization": "Mentalhealth.gov",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/MentalHealth.gov/"
+  },
+  {
+    "organization": "Mentalhealth.gov",
+    "platform": "X",
+    "url": "https://x.com/MentalHealthGov"
+  },
+  {
+    "organization": "National Health Service Corps",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/nationalhealthservicecorps"
+  },
+  {
+    "organization": "National Health Service Corps",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/national-health-service-corps/"
+  },
+  {
+    "organization": "National Health Service Corps",
+    "platform": "X",
+    "url": "https://x.com/NHSCorps"
+  },
+  {
+    "organization": "National Responsible Fatherhood Clearinghouse",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/fatherhoodgov"
+  },
+  {
+    "organization": "National Responsible Fatherhood Clearinghouse",
+    "platform": "X",
+    "url": "https://x.com/Fatherhoodgov"
+  },
+  {
+    "organization": "Nurses Corps",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HRSANurseCorps"
+  },
+  {
+    "organization": "Nurses Corps",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/nurse-corps/"
+  },
+  {
+    "organization": "Office of Family Assistance (OFA)",
+    "platform": "X",
+    "url": "https://x.com/OFA_ACF"
+  },
+  {
+    "organization": "Office of Head Start (OHS)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HeadStartgov"
+  },
+  {
+    "organization": "Office of Head Start (OHS)",
+    "platform": "X",
+    "url": "https://x.com/HeadStartgov"
+  },
+  {
+    "organization": "Office of Infectious Disease and HIV/AIDS Policy",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/HIVgov/"
+  },
+  {
+    "organization": "Office of Infectious Disease and HIV/AIDS Policy",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/hivgov/"
+  },
+  {
+    "organization": "Office of Infectious Disease and HIV/AIDS Policy",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/office-of-infectious-disease-and-hiv-aids-policy/"
+  },
+  {
+    "organization": "Office of Infectious Disease and HIV/AIDS Policy",
+    "platform": "X",
+    "url": "https://x.com/HIVGov"
+  },
+  {
+    "organization": "Office of Infectious Disease and HIV/AIDS Policy",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/hivgov"
+  },
+  {
+    "organization": "Organ Donation",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/organdonor.gov/"
+  },
+  {
+    "organization": "Organ Donation",
+    "platform": "Facebook Español",
+    "url": "https://www.facebook.com/USdonaciondeorganos.gov/"
+  },
+  {
+    "organization": "ACF Capacity Building Center for States",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/10897894/"
+  },
+  {
+    "organization": "ACF Children’s Bureau Learning and Coordination Center",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/cblccacf/"
+  },
+  {
+    "organization": "ACF Children’s Bureau Learning and Coordination Center",
+    "platform": "X",
+    "url": "https://x.com/CBLCC_ACF"
+  },
+  {
+    "organization": "ACF Family and Youth Services Bureau (FYSB)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/FYSBgov"
+  },
+  {
+    "organization": "ACF Family and Youth Services Bureau (FYSB)",
+    "platform": "X",
+    "url": "https://x.com/FYSBgov"
+  },
+  {
+    "organization": "ACF Office of Community Services (OCS)",
+    "platform": "X",
+    "url": "https://x.com/OCS_ACFgov"
+  },
+  {
+    "organization": "ACF Office of Human Services Emergency Preparedness and Response (OHSEPR)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/profile.php?id=100066204115008"
+  },
+  {
+    "organization": "ACF Office of Human Services Emergency Preparedness and Response (OHSEPR)",
+    "platform": "X",
+    "url": "https://x.com/ACF_OHSEPR"
+  },
+  {
+    "organization": "ACF Office of Planning, Research, and Evaluation (OPRE)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/OPRE.ACF"
+  },
+  {
+    "organization": "ACF Office of Planning, Research, and Evaluation (OPRE)",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/opre_acf/"
+  },
+  {
+    "organization": "ACF Office of Planning, Research, and Evaluation (OPRE)",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/company/opreacf/"
+  },
+  {
+    "organization": "ACF Office of Planning, Research, and Evaluation (OPRE)",
+    "platform": "X",
+    "url": "https://x.com/OPRE_ACF"
+  },
+  {
+    "organization": "ACF Office on Trafficking in Persons (OTIP)",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/showcase/otip/"
+  },
+  {
+    "organization": "Administration for Native Americans (ANA)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/administrationfornativeamericans"
+  },
+  {
+    "organization": "Administration for Native Americans (ANA)",
+    "platform": "X",
+    "url": "https://x.com/ANA_ACFgov"
+  },
+  {
+    "organization": "ASPR Medical Reserve Corps",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/MedicalReserveCorps/"
+  },
+  {
+    "organization": "ASPR Medical Reserve Corps",
+    "platform": "X",
+    "url": "https://x.com/MRC_ASPR"
+  },
+  {
+    "organization": "Children's Bureau (CB)",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/thechildrensbureau"
+  },
+  {
+    "organization": "Child Welfare Information Gateway",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/childwelfare"
+  },
+  {
+    "organization": "Child Welfare Information Gateway",
+    "platform": "X",
+    "url": "https://x.com/ChildWelfareGov"
+  },
+  {
+    "organization": "CMS Innovation Center",
+    "platform": "X",
+    "url": "https://x.com/CMSinnovates"
+  },
+  {
+    "organization": "CuidadoDeSalud",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/Cuidadodesaludgov"
+  },
+  {
+    "organization": "CuidadoDeSalud",
+    "platform": "X",
+    "url": "https://x.com/CuidadoDeSalud"
+  },
+  {
+    "organization": "Healthcare.gov",
+    "platform": "Facebook",
+    "url": "https://www.facebook.com/Healthcare.gov/"
+  },
+  {
+    "organization": "Healthcare.gov",
+    "platform": "X",
+    "url": "https://x.com/HealthCareGov"
+  },
+  {
+    "organization": "Healthcare.gov",
+    "platform": "YouTube",
+    "url": "https://www.youtube.com/user/HealthCareGov"
+  },
+  {
+    "organization": "HHS/ASPR Biomedical Advanced Research and Development Authority (BARDA)",
+    "platform": "Instagram",
+    "url": "https://www.instagram.com/bardagov/"
+  },
+  {
+    "organization": "HHS/ASPR Biomedical Advanced Research and Development Authority (BARDA)",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/company/biomedical-advanced-research-and-development-authority-barda"
+  },
+  {
+    "organization": "HHS/ASPR Biomedical Advanced Research and Development Authority (BARDA)",
+    "platform": "X",
+    "url": "https://x.com/barda"
+  },
+  {
+    "organization": "HHS/OCIO 405(d)",
+    "platform": "LinkedIn",
+    "url": "https://www.linkedin.com/company/hhs-ask405d/"
+  },
+  {
+    "organization": "HHS/OCIO 405(d)",
+    "platform": "X",
+    "url": "https://x.com/ask405d"
+  }
+]

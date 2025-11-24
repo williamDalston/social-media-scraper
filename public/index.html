@@ -74,6 +74,140 @@
             gap: 15px;
         }
 
+        .customization-panel {
+            background: var(--hhs-white);
+            padding: 25px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .customization-panel.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--hhs-gray-medium);
+        }
+
+        .panel-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--hhs-text-primary);
+        }
+
+        .panel-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 20px;
+        }
+
+        .panel-section {
+            background: var(--hhs-gray-light);
+            padding: 20px;
+            border-radius: 4px;
+        }
+
+        .panel-section h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--hhs-primary-dark);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .checkbox-group {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--hhs-text-primary);
+            flex: 1;
+        }
+
+        .select-all-btn {
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .select-all-btn:hover {
+            background: var(--hhs-primary-dark);
+        }
+
+        .metric-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .metric-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--hhs-white);
+            border-radius: 4px;
+        }
+
+        .date-range-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .date-input {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .date-input label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--hhs-text-secondary);
+            text-transform: uppercase;
+        }
+
+        .date-input input {
+            padding: 10px;
+            border: 1px solid var(--hhs-gray-medium);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
         .btn {
             padding: 12px 24px;
             border: none;
@@ -113,9 +247,29 @@
             background: #4a5568;
         }
 
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--hhs-primary);
+            color: var(--hhs-primary);
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+        }
+
         .btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--hhs-gray-medium);
         }
 
         .stats-grid {
@@ -220,30 +374,6 @@
             background: var(--hhs-gray-light);
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .status-success {
-            background: #D4EDDA;
-            color: var(--hhs-success);
-        }
-
-        .status-warning {
-            background: #FFF3CD;
-            color: #856404;
-        }
-
-        .status-error {
-            background: #F8D7DA;
-            color: var(--hhs-danger);
-        }
-
         .loading {
             text-align: center;
             padding: 40px;
@@ -305,6 +435,23 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .filter-badge {
+            display: inline-block;
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -316,21 +463,113 @@
     <div class="container">
         <div class="action-bar">
             <div>
+                <button class="btn btn-primary" onclick="toggleCustomization()" id="customizeBtn">
+                    ⚙️ Customize Scraper
+                </button>
                 <button class="btn btn-primary" onclick="triggerWorkflow()" id="triggerBtn">
-                    🚀 Run Scraper Now
+                    🚀 Run Scraper
                 </button>
                 <button class="btn btn-secondary" onclick="refreshData()">
                     🔄 Refresh Data
                 </button>
             </div>
             <div>
+                <button class="btn btn-success" onclick="exportCustomizedData()" id="exportCustomBtn">
+                    📊 Export Custom Data
+                </button>
                 <a href="data/hhs_social_media_data.csv" class="btn btn-success" download id="downloadCsv">
-                    📊 Download CSV
+                    📥 Download All CSV
                 </a>
                 <a href="data/hhs_social_media_data.json" class="btn btn-success" download id="downloadJson">
-                    📋 Download JSON
+                    📥 Download All JSON
                 </a>
             </div>
+        </div>
+
+        <div class="customization-panel" id="customizationPanel">
+            <div class="panel-header">
+                <h2>Scraper Customization Options</h2>
+                <button class="btn btn-outline" onclick="toggleCustomization()">✕ Close</button>
+            </div>
+            
+            <div class="panel-sections">
+                <div class="panel-section">
+                    <h3>Platforms</h3>
+                    <button class="select-all-btn" onclick="selectAllPlatforms()">Select All</button>
+                    <div class="checkbox-group" id="platformCheckboxes">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Organizations</h3>
+                    <button class="select-all-btn" onclick="selectAllOrganizations()">Select All</button>
+                    <div class="checkbox-group" id="organizationCheckboxes">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Metrics to Collect</h3>
+                    <div class="metric-group">
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-followers" checked>
+                            <label for="metric-followers">Followers</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-following" checked>
+                            <label for="metric-following">Following</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-posts" checked>
+                            <label for="metric-posts">Posts</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-likes" checked>
+                            <label for="metric-likes">Likes</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-comments" checked>
+                            <label for="metric-comments">Comments</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-shares" checked>
+                            <label for="metric-shares">Shares</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-engagement" checked>
+                            <label for="metric-engagement">Engagement Total</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-subscribers" checked>
+                            <label for="metric-subscribers">Subscribers (YouTube)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Date Range</h3>
+                    <div class="date-range-group">
+                        <div class="date-input">
+                            <label>Start Date</label>
+                            <input type="date" id="startDate">
+                        </div>
+                        <div class="date-input">
+                            <label>End Date</label>
+                            <input type="date" id="endDate">
+                        </div>
+                    </div>
+                    <button class="select-all-btn" onclick="resetDateRange()" style="margin-top: 10px;">Reset Date Range</button>
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <button class="btn btn-secondary" onclick="resetCustomization()">Reset All</button>
+                <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-success" onclick="exportCustomizedData()">Export Custom Data</button>
+            </div>
+
+            <div class="active-filters" id="activeFilters"></div>
         </div>
 
         <div id="workflowStatus"></div>
@@ -384,10 +623,19 @@
         let platformChart = null;
         let organizationChart = null;
         let dataCache = null;
+        let filteredData = null;
+        let activeFilters = {
+            platforms: [],
+            organizations: [],
+            metrics: ['followers_count', 'following_count', 'posts_count', 'likes_count', 'comments_count', 'shares_count', 'engagements_total', 'subscribers_count'],
+            startDate: null,
+            endDate: null
+        };
 
         // Load data on page load
         window.addEventListener('DOMContentLoaded', () => {
             loadData();
+            initializeCustomization();
             // Auto-refresh every 5 minutes
             setInterval(loadData, 300000);
         });
@@ -400,39 +648,209 @@
                 }
                 const data = await response.json();
                 dataCache = data;
-                updateDashboard(data);
+                applyFilters();
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('dataTable').innerHTML = `
                     <div class="alert alert-warning">
-                        <strong>Data not available yet.</strong> Click "Run Scraper Now" to generate data, 
+                        <strong>Data not available yet.</strong> Click "Run Scraper" to generate data, 
                         or wait for the automatic daily update (runs at 2 AM UTC).
                     </div>
                 `;
             }
         }
 
+        function initializeCustomization() {
+            // Load available platforms and organizations from accounts JSON
+            fetch('hhs_accounts.json')
+                .then(response => response.json())
+                .then(accounts => {
+                    const platforms = [...new Set(accounts.map(a => a.platform))];
+                    const organizations = [...new Set(accounts.map(a => a.organization))];
+
+                    // Populate platform checkboxes
+                    const platformContainer = document.getElementById('platformCheckboxes');
+                    platforms.sort().forEach(platform => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
+                                   onchange="updateFilters()">
+                            <label for="platform-${platform}">${platform}</label>
+                        `;
+                        platformContainer.appendChild(div);
+                    });
+
+                    // Populate organization checkboxes
+                    const orgContainer = document.getElementById('organizationCheckboxes');
+                    organizations.sort().forEach(org => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="org-${org.replace(/\s+/g, '-')}" value="${org}" checked 
+                                   onchange="updateFilters()">
+                            <label for="org-${org.replace(/\s+/g, '-')}">${org}</label>
+                        `;
+                        orgContainer.appendChild(div);
+                    });
+
+                    // Initialize active filters
+                    activeFilters.platforms = platforms;
+                    activeFilters.organizations = organizations;
+                })
+                .catch(() => {
+                    // If accounts file not available, use defaults
+                    const defaultPlatforms = ['X', 'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'Flickr', 'Truth Social'];
+                    const platformContainer = document.getElementById('platformCheckboxes');
+                    defaultPlatforms.forEach(platform => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
+                                   onchange="updateFilters()">
+                            <label for="platform-${platform}">${platform}</label>
+                        `;
+                        platformContainer.appendChild(div);
+                    });
+                });
+        }
+
+        function toggleCustomization() {
+            const panel = document.getElementById('customizationPanel');
+            panel.classList.toggle('active');
+        }
+
+        function selectAllPlatforms() {
+            const checkboxes = document.querySelectorAll('#platformCheckboxes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateFilters();
+        }
+
+        function selectAllOrganizations() {
+            const checkboxes = document.querySelectorAll('#organizationCheckboxes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateFilters();
+        }
+
+        function updateFilters() {
+            // Get selected platforms
+            activeFilters.platforms = Array.from(document.querySelectorAll('#platformCheckboxes input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            // Get selected organizations
+            activeFilters.organizations = Array.from(document.querySelectorAll('#organizationCheckboxes input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            // Get selected metrics
+            activeFilters.metrics = [];
+            if (document.getElementById('metric-followers').checked) activeFilters.metrics.push('followers_count');
+            if (document.getElementById('metric-following').checked) activeFilters.metrics.push('following_count');
+            if (document.getElementById('metric-posts').checked) activeFilters.metrics.push('posts_count');
+            if (document.getElementById('metric-likes').checked) activeFilters.metrics.push('likes_count');
+            if (document.getElementById('metric-comments').checked) activeFilters.metrics.push('comments_count');
+            if (document.getElementById('metric-shares').checked) activeFilters.metrics.push('shares_count');
+            if (document.getElementById('metric-engagement').checked) activeFilters.metrics.push('engagements_total');
+            if (document.getElementById('metric-subscribers').checked) activeFilters.metrics.push('subscribers_count');
+
+            // Get date range
+            activeFilters.startDate = document.getElementById('startDate').value || null;
+            activeFilters.endDate = document.getElementById('endDate').value || null;
+
+            updateActiveFiltersDisplay();
+        }
+
+        function updateActiveFiltersDisplay() {
+            const container = document.getElementById('activeFilters');
+            const badges = [];
+
+            if (activeFilters.platforms.length > 0) {
+                badges.push(`<span class="filter-badge">Platforms: ${activeFilters.platforms.length}</span>`);
+            }
+            if (activeFilters.organizations.length > 0) {
+                badges.push(`<span class="filter-badge">Organizations: ${activeFilters.organizations.length}</span>`);
+            }
+            if (activeFilters.metrics.length > 0) {
+                badges.push(`<span class="filter-badge">Metrics: ${activeFilters.metrics.length}</span>`);
+            }
+            if (activeFilters.startDate || activeFilters.endDate) {
+                badges.push(`<span class="filter-badge">Date Range: ${activeFilters.startDate || 'Any'} to ${activeFilters.endDate || 'Any'}</span>`);
+            }
+
+            container.innerHTML = badges.length > 0 
+                ? '<strong>Active Filters:</strong> ' + badges.join(' ') 
+                : '<strong>No filters active</strong>';
+        }
+
+        function applyFilters() {
+            if (!dataCache || !dataCache.data) return;
+
+            filteredData = dataCache.data.filter(item => {
+                // Platform filter
+                if (activeFilters.platforms.length > 0 && !activeFilters.platforms.includes(item.platform)) {
+                    return false;
+                }
+
+                // Organization filter
+                if (activeFilters.organizations.length > 0 && !activeFilters.organizations.includes(item.organization)) {
+                    return false;
+                }
+
+                // Date range filter
+                if (activeFilters.startDate && item.snapshot_date && item.snapshot_date < activeFilters.startDate) {
+                    return false;
+                }
+                if (activeFilters.endDate && item.snapshot_date && item.snapshot_date > activeFilters.endDate) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Get latest snapshot date from filtered data
+            const latestDate = filteredData.length > 0 
+                ? Math.max(...filteredData.map(d => new Date(d.snapshot_date || 0).getTime()))
+                : null;
+            const latestData = latestDate 
+                ? filteredData.filter(d => d.snapshot_date && new Date(d.snapshot_date).getTime() === latestDate)
+                : filteredData;
+
+            updateDashboard(latestData);
+        }
+
+        function resetCustomization() {
+            // Reset all checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            updateFilters();
+            applyFilters();
+        }
+
+        function resetDateRange() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            updateFilters();
+        }
+
         function updateDashboard(data) {
-            if (!data || !data.data || data.data.length === 0) {
+            if (!data || data.length === 0) {
                 document.getElementById('dataTable').innerHTML = `
                     <div class="alert alert-info">
-                        No data available. Run the scraper to collect metrics.
+                        No data matches your current filters. Try adjusting your selection criteria.
                     </div>
                 `;
                 return;
             }
 
             // Update stats
-            const accounts = new Set(data.data.map(d => `${d.platform}/${d.handle}`));
-            const platforms = new Set(data.data.map(d => d.platform));
-            const orgs = new Set(data.data.map(d => d.organization));
+            const accounts = new Set(data.map(d => `${d.platform}/${d.handle}`));
+            const platforms = new Set(data.map(d => d.platform));
+            const orgs = new Set(data.map(d => d.organization));
             
-            // Get latest snapshot date
-            const latestDate = data.data[0]?.snapshot_date;
-            const latestData = data.data.filter(d => d.snapshot_date === latestDate);
-            
-            // Calculate total followers from latest snapshot
-            const totalFollowers = latestData.reduce((sum, d) => sum + (d.followers_count || 0), 0);
+            const totalFollowers = data.reduce((sum, d) => sum + (d.followers_count || 0), 0);
+            const latestDate = data[0]?.snapshot_date;
 
             document.getElementById('totalAccounts').textContent = accounts.size.toLocaleString();
             document.getElementById('platformCount').textContent = platforms.size;
@@ -442,10 +860,10 @@
                 : 'N/A';
 
             // Update charts
-            updateCharts(latestData);
+            updateCharts(data);
 
             // Update table
-            updateTable(latestData.slice(0, 20)); // Show top 20
+            updateTable(data.slice(0, 50)); // Show top 50
         }
 
         function updateCharts(data) {
@@ -546,6 +964,7 @@
         }
 
         function updateTable(data) {
+            const visibleMetrics = activeFilters.metrics;
             const tableHTML = `
                 <table>
                     <thead>
@@ -553,9 +972,12 @@
                             <th>Platform</th>
                             <th>Handle</th>
                             <th>Organization</th>
-                            <th>Followers</th>
-                            <th>Posts</th>
-                            <th>Engagement</th>
+                            ${visibleMetrics.includes('followers_count') ? '<th>Followers</th>' : ''}
+                            ${visibleMetrics.includes('posts_count') ? '<th>Posts</th>' : ''}
+                            ${visibleMetrics.includes('engagements_total') ? '<th>Engagement</th>' : ''}
+                            ${visibleMetrics.includes('likes_count') ? '<th>Likes</th>' : ''}
+                            ${visibleMetrics.includes('comments_count') ? '<th>Comments</th>' : ''}
+                            ${visibleMetrics.includes('shares_count') ? '<th>Shares</th>' : ''}
                             <th>Date</th>
                         </tr>
                     </thead>
@@ -565,9 +987,12 @@
                                 <td>${d.platform}</td>
                                 <td><strong>${d.handle}</strong></td>
                                 <td>${d.organization}</td>
-                                <td>${(d.followers_count || 0).toLocaleString()}</td>
-                                <td>${(d.posts_count || 0).toLocaleString()}</td>
-                                <td>${(d.engagements_total || 0).toLocaleString()}</td>
+                                ${visibleMetrics.includes('followers_count') ? `<td>${(d.followers_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('posts_count') ? `<td>${(d.posts_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('engagements_total') ? `<td>${(d.engagements_total || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('likes_count') ? `<td>${(d.likes_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('comments_count') ? `<td>${(d.comments_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('shares_count') ? `<td>${(d.shares_count || 0).toLocaleString()}</td>` : ''}
                                 <td>${d.snapshot_date ? new Date(d.snapshot_date).toLocaleDateString() : 'N/A'}</td>
                             </tr>
                         `).join('')}
@@ -575,6 +1000,59 @@
                 </table>
             `;
             document.getElementById('dataTable').innerHTML = tableHTML;
+        }
+
+        function exportCustomizedData() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('No filtered data to export. Apply filters first or load data.');
+                return;
+            }
+
+            // Create filtered export
+            const exportData = {
+                export_date: new Date().toISOString(),
+                total_records: filteredData.length,
+                filters_applied: activeFilters,
+                data: filteredData
+            };
+
+            // Create CSV
+            const headers = ['Platform', 'Handle', 'Organization', 'Date'];
+            activeFilters.metrics.forEach(metric => {
+                const header = metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                headers.push(header);
+            });
+
+            let csv = headers.join(',') + '\n';
+            filteredData.forEach(item => {
+                const row = [
+                    item.platform,
+                    item.handle,
+                    item.organization,
+                    item.snapshot_date || ''
+                ];
+                activeFilters.metrics.forEach(metric => {
+                    row.push(item[metric] || 0);
+                });
+                csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hhs_social_media_custom_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+
+            // Also create JSON download
+            const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const jsonUrl = window.URL.createObjectURL(jsonBlob);
+            const jsonA = document.createElement('a');
+            jsonA.href = jsonUrl;
+            jsonA.download = `hhs_social_media_custom_${new Date().toISOString().split('T')[0]}.json`;
+            // Uncomment to also download JSON
+            // jsonA.click();
         }
 
         async function triggerWorkflow() {
@@ -592,8 +1070,6 @@
                 </div>
             `;
 
-            // Note: To trigger workflow via API, you need a GitHub Personal Access Token
-            // For now, show instructions
             statusDiv.innerHTML = `
                 <div class="alert alert-info">
                     <strong>Manual Workflow Trigger:</strong><br>
@@ -605,7 +1081,7 @@
             `;
 
             btn.disabled = false;
-            btn.textContent = '🚀 Run Scraper Now';
+            btn.textContent = '🚀 Run Scraper';
         }
 
         function refreshData() {
