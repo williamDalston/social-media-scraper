@@ -156,8 +156,11 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     # This prevents any logic errors from causing SQLite files to be treated as production DBs
     # Check happens FIRST, before any other logic
     # This MUST catch 'social_media.db' and all other .db files
-    is_db_file = db_path.endswith('.db')
-    if is_db_file:
+    # Use multiple checks to be absolutely sure
+    is_db_file = ('.db' in db_path) and (db_path.endswith('.db') or db_path.endswith('.DB'))
+    
+    # Force check - if it contains .db anywhere, treat as SQLite
+    if is_db_file or 'social_media.db' in db_path or db_path == 'social_media.db':
         # Force SQLite handling - construct URL and return early
         # Handle both 'sqlite:///' and plain filenames
         if db_path.startswith('sqlite:///'):
