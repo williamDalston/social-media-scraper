@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from celery_app import celery_app
 from tasks.utils import get_db_session
 from tasks.scraper_tasks import scrape_all_accounts
+from models.job import Job
 
 # Set up logging
 logger = logging.getLogger(__name__)
