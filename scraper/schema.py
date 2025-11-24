@@ -209,13 +209,18 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 # Construct SQLite URL
                 # SQLite URLs: sqlite:///relative/path (3 slashes) or sqlite:////absolute/path (4 slashes)
                 # For absolute paths, we need 4 slashes: sqlite:////absolute/path
+                # SQLAlchemy expects: sqlite:///./relative or sqlite:////absolute
                 if normalized.startswith('/'):
                     # Absolute path - use 4 slashes: sqlite:////absolute/path
-                    # Don't add another slash since normalized already starts with /
-                    sqlite_url = f'sqlite://{normalized}'
+                    # This creates: sqlite:/// + /absolute/path = sqlite:////absolute/path
+                    sqlite_url = f'sqlite:///{normalized}'
+                    sys.stderr.write(f"[INIT_DB ULTIMATE] Constructed absolute path URL with 4 slashes: '{sqlite_url}'\n")
+                    sys.stderr.flush()
                 else:
                     # Relative path - use 3 slashes: sqlite:///relative/path
                     sqlite_url = f'sqlite:///{normalized}'
+                    sys.stderr.write(f"[INIT_DB ULTIMATE] Constructed relative path URL with 3 slashes: '{sqlite_url}'\n")
+                    sys.stderr.flush()
                     
             except Exception as path_error:
                 sys.stderr.write(f"[INIT_DB ULTIMATE] Path normalization error: {path_error}\n")
