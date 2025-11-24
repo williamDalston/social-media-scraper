@@ -174,26 +174,79 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         elif db_path_str.startswith('sqlite://'):
             sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
         else:
-            # Make absolute and normalize
+            # Make absolute and normalize - be very careful here
             try:
-                abs_path = os.path.abspath(db_path_str) if not os.path.isabs(db_path_str) else db_path_str
-                normalized = abs_path.replace('\\', '/').replace('//', '/')
-                sqlite_url = f'sqlite:///{normalized}'
-            except Exception:
-                sqlite_url = f'sqlite:///{db_path_str.replace(os.sep, "/")}'
+                # Get current working directory
+                cwd = os.getcwd()
+                sys.stderr.write(f"[INIT_DB ULTIMATE] CWD: '{cwd}'\n")
+                sys.stderr.flush()
+                
+                # Make absolute path
+                if os.path.isabs(db_path_str):
+                    abs_path = db_path_str
+                else:
+                    abs_path = os.path.abspath(db_path_str)
+                
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Absolute path: '{abs_path}'\n")
+                sys.stderr.flush()
+                
+                # Normalize path separators - MUST use forward slashes
+                # Remove any backslashes first
+                normalized = abs_path.replace('\\', '/')
+                # Remove double slashes (but preserve sqlite:///)
+                while '//' in normalized and not normalized.startswith('sqlite://'):
+                    normalized = normalized.replace('//', '/')
+                
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Normalized path: '{normalized}'\n")
+                sys.stderr.flush()
+                
+                # Construct SQLite URL - ensure it starts with sqlite:///
+                if normalized.startswith('/'):
+                    # Unix-style absolute path
+                    sqlite_url = f'sqlite://{normalized}'
+                else:
+                    # Relative or Windows path
+                    sqlite_url = f'sqlite:///{normalized}'
+                    
+            except Exception as path_error:
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Path normalization error: {path_error}\n")
+                sys.stderr.flush()
+                # Ultimate fallback - use the string as-is with sqlite:/// prefix
+                simple_path = db_path_str.replace('\\', '/').replace('//', '/')
+                sqlite_url = f'sqlite:///{simple_path}'
         
-        sys.stderr.write(f"[INIT_DB ULTIMATE] SQLite URL: '{sqlite_url}'\n")
+        sys.stderr.write(f"[INIT_DB ULTIMATE] SQLite URL before validation: '{sqlite_url}'\n")
         sys.stderr.flush()
         
-        # Validate
+        # CRITICAL VALIDATION: Ensure URL is in correct format
+        # SQLite URLs must be: sqlite:///path or sqlite:///./path or sqlite:////absolute/path
+        if not sqlite_url.startswith('sqlite://'):
+            # Completely wrong - rebuild from scratch
+            sys.stderr.write(f"[INIT_DB ULTIMATE] URL doesn't start with sqlite://, rebuilding...\n")
+            sys.stderr.flush()
+            simple = db_path_str.replace('\\', '/')
+            sqlite_url = f'sqlite:///{simple}'
+        elif sqlite_url.startswith('sqlite://') and not sqlite_url.startswith('sqlite:///'):
+            # Missing the third slash
+            sqlite_url = sqlite_url.replace('sqlite://', 'sqlite:///', 1)
+        
+        # Final validation
         if not sqlite_url.startswith('sqlite:///'):
-            if sqlite_url.startswith('sqlite://'):
-                sqlite_url = sqlite_url.replace('sqlite://', 'sqlite:///', 1)
-            else:
-                sqlite_url = f'sqlite:///{sqlite_url}'
+            # Last resort - just prepend sqlite:/// to the original string
+            sys.stderr.write(f"[INIT_DB ULTIMATE] Final validation failed, using last resort...\n")
+            sys.stderr.flush()
+            sqlite_url = f'sqlite:///{db_path_str}'
         
-        sys.stderr.write(f"[INIT_DB ULTIMATE] Final SQLite URL: '{sqlite_url}'\n")
+        sys.stderr.write(f"[INIT_DB ULTIMATE] Final validated SQLite URL: '{sqlite_url}'\n")
         sys.stderr.flush()
+        
+        # One more check - ensure URL is not empty and is a string
+        if not sqlite_url or not isinstance(sqlite_url, str):
+            raise ValueError(f"Invalid SQLite URL after all fixes: '{sqlite_url}' (type: {type(sqlite_url).__name__})")
+        
+        # Ensure it's at least 11 characters (sqlite:/// + something)
+        if len(sqlite_url) < 11:
+            raise ValueError(f"SQLite URL too short: '{sqlite_url}'")
         
         # Create engine
         try:
