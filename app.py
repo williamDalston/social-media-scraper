@@ -633,24 +633,38 @@ def run_scraper():
             'success': True
         })
     except Exception as e:
+        # Record failure (if metrics available)
         try:
             metrics = get_metrics()
-        metrics.record_scraper_execution(0, success=False)
+            metrics.record_scraper_execution(0, success=False)
+        except:
+            pass
         
-        # Log failed scraper run
+        # Log failed scraper run (if user is authenticated)
         if user:
-            log_security_event(
-                AuditEventType.SCRAPER_RUN,
-                user_id=user.id,
-                username=user.username,
-                resource_type='scraper',
-                action='run',
-                details={'mode': mode},
-                success=False,
-                error_message=str(e)
-            )
+            try:
+                log_security_event(
+                    AuditEventType.SCRAPER_RUN,
+                    user_id=user.id,
+                    username=user.username,
+                    resource_type='scraper',
+                    action='run',
+                    details={'mode': mode, 'error': str(e)},
+                    success=False
+                )
+            except:
+                pass
         
-        return jsonify({'error': str(e)}), 500
+        # Log error
+        try:
+            logger.exception("Error running scraper")
+        except:
+            pass
+        
+        return jsonify({
+            'error': f'Error running scraper: {str(e)}',
+            'success': False
+        }), 500
 
 @app.route('/api/accounts')
 @limiter.limit("100 per minute")
