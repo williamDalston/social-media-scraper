@@ -103,14 +103,14 @@ class PerformanceBenchmark:
 
 
 @pytest.fixture
-def benchmark():
-    """Performance benchmark fixture."""
+def perf_benchmark():
+    """Performance benchmark fixture (renamed to avoid conflict with pytest-benchmark)."""
     return PerformanceBenchmark()
 
 
 def test_api_summary_performance(benchmark, client):
     """Benchmark /api/summary endpoint."""
-    result = benchmark.benchmark_endpoint(client, 'GET', '/api/summary', iterations=20)
+    result = perf_benchmark.benchmark_endpoint(client, 'GET', '/api/summary', iterations=20)
     
     # Assertions
     assert result['avg_time'] < 1.0, f"Average time {result['avg_time']}s exceeds 1s target"
@@ -123,10 +123,10 @@ def test_api_summary_performance(benchmark, client):
     print(f"  P99: {result['p99_time']*1000:.2f}ms")
 
 
-def test_api_history_performance(benchmark, client):
+def test_api_history_performance(perf_benchmark, client):
     """Benchmark /api/history endpoint."""
     # Need a valid account first
-    result = benchmark.benchmark_endpoint(
+    result = perf_benchmark.benchmark_endpoint(
         client, 'GET', '/api/history/x/testhandle', iterations=20
     )
     
@@ -134,29 +134,29 @@ def test_api_history_performance(benchmark, client):
     assert result['success_rate'] >= 90  # May have 404s for non-existent accounts
 
 
-def test_api_grid_performance(benchmark, client):
+def test_api_grid_performance(perf_benchmark, client):
     """Benchmark /api/grid endpoint."""
-    result = benchmark.benchmark_endpoint(client, 'GET', '/api/grid', iterations=10)
+    result = perf_benchmark.benchmark_endpoint(client, 'GET', '/api/grid', iterations=10)
     
     assert result['avg_time'] < 2.0  # Grid can be slower due to more data
     print(f"\n/api/grid Performance:")
     print(f"  Avg: {result['avg_time']*1000:.2f}ms")
 
 
-def test_cache_performance(benchmark):
+def test_cache_performance(perf_benchmark):
     """Benchmark cache operations."""
     from cache.multi_level import get_multi_cache
     
     multi_cache = get_multi_cache()
     
     # Test cache set
-    set_result = benchmark.benchmark_cache_performance(
+    set_result = perf_benchmark.benchmark_cache_performance(
         lambda: multi_cache.set('test_key', {'data': 'test'}), 
         iterations=100
     )
     
     # Test cache get
-    get_result = benchmark.benchmark_cache_performance(
+    get_result = perf_benchmark.benchmark_cache_performance(
         lambda: multi_cache.get('test_key'),
         iterations=100
     )
@@ -169,7 +169,7 @@ def test_cache_performance(benchmark):
     print(f"  Get Avg: {get_result['avg_time']*1000:.2f}ms")
 
 
-def test_database_query_performance(benchmark, db_session):
+def test_database_query_performance(perf_benchmark, db_session):
     """Benchmark database query performance."""
     from scraper.schema import DimAccount, FactFollowersSnapshot
     from sqlalchemy import func
@@ -180,7 +180,7 @@ def test_database_query_performance(benchmark, db_session):
             func.max(FactFollowersSnapshot.snapshot_date)
         ).scalar()
     
-    result = benchmark.benchmark_database_query(query_latest_date, iterations=20)
+    result = perf_benchmark.benchmark_database_query(query_latest_date, iterations=20)
     
     assert result['avg_time'] < 0.1  # 100ms
     print(f"\nDatabase Query Performance:")
