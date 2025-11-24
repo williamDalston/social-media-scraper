@@ -206,7 +206,6 @@ def init_db(db_path=None, enable_profiling: bool = False):
     """
     import os
     import sys
-    from sqlalchemy import create_engine
     from sqlalchemy.pool import NullPool, QueuePool
     from sqlalchemy.engine.url import make_url
     
@@ -317,9 +316,13 @@ def init_db(db_path=None, enable_profiling: bool = False):
     
     return engine
 
-def _ensure_indexes(engine, db_path):
+def _ensure_indexes(engine, _db_path=None):
     """
     Ensure database indexes exist for performance optimization.
+    
+    Args:
+        engine: SQLAlchemy engine
+        _db_path: Unused parameter (kept for backward compatibility)
     """
     import sqlite3
     
