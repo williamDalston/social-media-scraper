@@ -783,6 +783,11 @@ def run_scraper():
                 'checks': preflight_results.get('checks', []) if preflight_results else None
             })
         except Exception as sync_error:
+            logger.exception("Error running scraper synchronously")
+            return jsonify({
+                'error': f'Error running scraper: {str(sync_error)}',
+                'success': False
+            }), 500
     except Exception as e:
         # Record failure (if metrics available)
         try:
