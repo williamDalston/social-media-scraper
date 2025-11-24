@@ -206,13 +206,10 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 sys.stderr.write(f"[INIT_DB ULTIMATE] Normalized path: '{normalized}'\n")
                 sys.stderr.flush()
                 
-                # Construct SQLite URL - ensure it starts with sqlite:///
-                if normalized.startswith('/'):
-                    # Unix-style absolute path
-                    sqlite_url = f'sqlite://{normalized}'
-                else:
-                    # Relative or Windows path
-                    sqlite_url = f'sqlite:///{normalized}'
+                # Construct SQLite URL - ALWAYS use sqlite:/// format
+                # SQLite URLs must be: sqlite:///path (with 3 slashes after sqlite:)
+                # For absolute paths starting with /, we still need sqlite:///
+                sqlite_url = f'sqlite:///{normalized}'
                     
             except Exception as path_error:
                 sys.stderr.write(f"[INIT_DB ULTIMATE] Path normalization error: {path_error}\n")
