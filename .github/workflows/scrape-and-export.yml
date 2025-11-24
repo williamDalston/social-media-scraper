@@ -14,9 +14,43 @@ jobs:
       - name: "FORCE CHECKOUT LATEST CODE + PROOF"
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}
+          ref: ${{ github.head_ref || github.ref || 'main' }}
           fetch-depth: 0
           clean: true
+      
+      - name: "CRITICAL DIAGNOSTIC - Verify exact environment"
+        run: |
+          echo "=== GIT INFORMATION ==="
+          echo "Commit: $(git rev-parse HEAD)"
+          echo "Branch: $(git branch --show-current)"
+          echo "Remote: $(git remote get-url origin)"
+          echo ""
+          echo "=== PYTHON ENVIRONMENT ==="
+          python --version
+          python -c "import sys; print('Python path:'); [print(f'  {p}') for p in sys.path]"
+          echo ""
+          echo "=== SCHEMA.PY VERIFICATION ==="
+          echo "File exists: $(test -f scraper/schema.py && echo 'YES' || echo 'NO')"
+          echo "File size: $(stat -f%z scraper/schema.py 2>/dev/null || stat -c%s scraper/schema.py 2>/dev/null || echo 'unknown')"
+          echo "First 10 lines:"
+          head -10 scraper/schema.py
+          echo ""
+          echo "=== MODULE IMPORT TEST ==="
+          python -c "
+          import sys
+          import os
+          sys.path.insert(0, os.getcwd())
+          from scraper.schema import init_db
+          import inspect
+          print(f'Module file: {inspect.getfile(init_db)}')
+          print(f'Module line: {inspect.getsourcelines(init_db)[1]}')
+          print(f'Has _construct_sqlite_url: {\"_construct_sqlite_url\" in inspect.getsource(init_db)}')
+          " || echo "ERROR: Failed to import or inspect module"
+          echo ""
+          echo "=== CLEAR PYTHON CACHE ==="
+          find . -type d -name "__pycache__" -exec rm -r {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          echo "Python cache cleared"
       
       - name: "VERIFY schema.py IS REALLY NEW"
         run: |
