@@ -162,26 +162,40 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     # Force check - if it contains .db anywhere, treat as SQLite
     if is_db_file or 'social_media.db' in db_path or db_path == 'social_media.db':
         # Force SQLite handling - construct URL and return early
-        # Handle both 'sqlite:///' and plain filenames
-        if db_path.startswith('sqlite:///'):
-            sqlite_url = db_path
-        elif db_path.startswith('sqlite://'):
-            sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
-        else:
-            # Convert to absolute path for CI/CD compatibility
-            if not os.path.isabs(db_path):
-                # Relative path - make it absolute
-                abs_path = os.path.abspath(db_path)
-            else:
-                abs_path = db_path
-            # Ensure proper SQLite URL format with forward slashes
-            sqlite_url = f'sqlite:///{abs_path.replace(os.sep, "/")}'
-        
-        # Log explicitly to help debug CI/CD issues
-        logger.info(f"[INIT_DB] Force-detected SQLite from .db extension: db_path='{db_path}' -> sqlite_url='{sqlite_url}'")
-        print(f"[INIT_DB DEBUG] Detected .db file: '{db_path}' -> '{sqlite_url}'", file=sys.stderr)
-        print(f"[INIT_DB DEBUG] Absolute path: {os.path.abspath(db_path) if not os.path.isabs(db_path) else db_path}", file=sys.stderr)
         try:
+            # Log explicitly to help debug CI/CD issues - do this FIRST
+            print(f"[INIT_DB DEBUG] ENTERED .db check block. db_path='{db_path}'", file=sys.stderr, flush=True)
+            logger.info(f"[INIT_DB] Force-detected SQLite from .db extension: db_path='{db_path}'")
+            
+            # Handle both 'sqlite:///' and plain filenames
+            if db_path.startswith('sqlite:///'):
+                sqlite_url = db_path
+            elif db_path.startswith('sqlite://'):
+                sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
+            else:
+                # Convert to absolute path for CI/CD compatibility
+                try:
+                    if not os.path.isabs(db_path):
+                        # Relative path - make it absolute
+                        abs_path = os.path.abspath(db_path)
+                    else:
+                        abs_path = db_path
+                    # Ensure proper SQLite URL format with forward slashes
+                    # Remove any backslashes and ensure forward slashes
+                    normalized_path = abs_path.replace('\\', '/').replace('//', '/')
+                    sqlite_url = f'sqlite:///{normalized_path}'
+                except Exception as path_error:
+                    # Fallback to simple construction if path resolution fails
+                    print(f"[INIT_DB DEBUG] Path resolution failed: {path_error}, using simple URL", file=sys.stderr, flush=True)
+                    sqlite_url = f'sqlite:///{db_path.replace(os.sep, "/")}'
+            
+            # Validate URL format before using it
+            if not sqlite_url.startswith('sqlite:///'):
+                raise ValueError(f"Invalid SQLite URL constructed: '{sqlite_url}' from db_path: '{db_path}'")
+            
+            print(f"[INIT_DB DEBUG] Constructed SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+            print(f"[INIT_DB DEBUG] About to call create_engine with URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+            
             engine = create_engine(
                 sqlite_url,
                 poolclass=NullPool,
@@ -191,6 +205,7 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 },
                 echo=False
             )
+            print(f"[INIT_DB DEBUG] create_engine succeeded!", file=sys.stderr, flush=True)
             # Continue with rest of initialization (tables, indexes, etc.)
             # But skip the detection logic below
             if enable_profiling:
