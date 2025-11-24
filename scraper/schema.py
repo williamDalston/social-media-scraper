@@ -223,42 +223,91 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
             
     elif is_production_db:
         # Production database configuration - use QueuePool with optimization
-        # Validate that db_path looks like a valid database URL
-        if not (db_path.startswith('postgresql://') or 
-                db_path.startswith('postgresql+psycopg2://') or
-                db_path.startswith('mysql://') or
-                db_path.startswith('mysql+pymysql://')):
-            raise ValueError(
-                f"Invalid production database URL format: {db_path!r}. "
-                "Expected format: postgresql://user:pass@host:port/db or mysql://user:pass@host:port/db"
+        # CRITICAL: Double-check this is actually a production DB URL, not a SQLite file
+        if db_path.endswith('.db') or (not '://' in db_path):
+            # This should have been caught earlier, but handle it as SQLite anyway
+            logger.warning(
+                f"Database path '{db_path}' looks like SQLite but was flagged as production DB. "
+                "Falling back to SQLite handling."
             )
-        
-        logger.info(f"Creating production database engine: {db_path[:50]}...")  # Log partial URL for security
-        try:
-            from config.performance_tuning import PerformanceTuner
-            tuner = PerformanceTuner()
-            pool_config = tuner.optimize_database_connections()
+            # Treat as SQLite
+            if db_path.startswith('sqlite:///'):
+                sqlite_url = db_path
+            elif db_path.startswith('sqlite://'):
+                sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
+            else:
+                sqlite_url = f'sqlite:///{db_path}'
             
-            engine = create_engine(
-                db_path,
-                poolclass=QueuePool,
-                **pool_config
-            )
-        except ImportError:
-            # PerformanceTuner not available - use default config
-            logger.warning("PerformanceTuner not available, using default pool configuration")
-            engine = create_engine(
-                db_path,
-                poolclass=QueuePool
-            )
-        except Exception as e:
-            raise ValueError(f"Failed to create production database engine with URL '{db_path}': {e}") from e
+            try:
+                engine = create_engine(
+                    sqlite_url,
+                    poolclass=NullPool,
+                    connect_args={
+                        'check_same_thread': False,
+                        'timeout': 20
+                    },
+                    echo=False
+                )
+            except Exception as e:
+                raise ValueError(f"Failed to create SQLite engine (fallback) with URL '{sqlite_url}': {e}") from e
+        else:
+            # Validate that db_path looks like a valid database URL
+            if not (db_path.startswith('postgresql://') or 
+                    db_path.startswith('postgresql+psycopg2://') or
+                    db_path.startswith('mysql://') or
+                    db_path.startswith('mysql+pymysql://')):
+                raise ValueError(
+                    f"Invalid production database URL format: {db_path!r}. "
+                    "Expected format: postgresql://user:pass@host:port/db or mysql://user:pass@host:port/db"
+                )
+            
+            logger.info(f"Creating production database engine: {db_path[:50]}...")  # Log partial URL for security
+            try:
+                from config.performance_tuning import PerformanceTuner
+                tuner = PerformanceTuner()
+                pool_config = tuner.optimize_database_connections()
+                
+                engine = create_engine(
+                    db_path,
+                    poolclass=QueuePool,
+                    **pool_config
+                )
+            except ImportError:
+                # PerformanceTuner not available - use default config
+                logger.warning("PerformanceTuner not available, using default pool configuration")
+                engine = create_engine(
+                    db_path,
+                    poolclass=QueuePool
+                )
+            except Exception as e:
+                raise ValueError(f"Failed to create production database engine with URL '{db_path}': {e}") from e
     else:
         # This should never happen due to validation above, but handle it anyway
-        raise ValueError(
-            f"Unable to determine database type from path: {db_path!r}. "
-            "This is a bug - please report it."
-        )
+        # If we get here, it means the path has a URL scheme we don't recognize
+        # But if it ends in .db, treat it as SQLite as a last resort
+        if db_path.endswith('.db'):
+            logger.warning(
+                f"Database path '{db_path}' has unrecognized URL scheme but ends in .db. "
+                "Treating as SQLite."
+            )
+            sqlite_url = f'sqlite:///{db_path}'
+            try:
+                engine = create_engine(
+                    sqlite_url,
+                    poolclass=NullPool,
+                    connect_args={
+                        'check_same_thread': False,
+                        'timeout': 20
+                    },
+                    echo=False
+                )
+            except Exception as e:
+                raise ValueError(f"Failed to create SQLite engine (last resort) with URL '{sqlite_url}': {e}") from e
+        else:
+            raise ValueError(
+                f"Unable to determine database type from path: {db_path!r}. "
+                "This is a bug - please report it."
+            )
     
     # Verify engine was created
     if engine is None:
