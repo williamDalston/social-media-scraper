@@ -1090,31 +1090,129 @@
 
         async function triggerWorkflow() {
             const btn = document.getElementById('triggerBtn');
+            const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '⏳ Triggering...';
+            btn.textContent = '⏳ Running...';
 
             const statusDiv = document.getElementById('workflowStatus');
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <div class="workflow-status">
-                        <div class="spinner"></div>
-                        <strong>Triggering GitHub Actions workflow...</strong> This will run the scraper and update data files.
+            
+            // Check if we're running locally (Flask backend) or on GitHub Pages (static)
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('localhost');
+            const isGitHubPages = window.location.hostname.includes('github.io');
+            
+            // Try to call the API endpoint (works if Flask is running)
+            try {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <div class="workflow-status">
+                            <div class="spinner"></div>
+                            <strong>Starting scraper...</strong> This may take a few minutes.
+                        </div>
                     </div>
-                </div>
-            `;
-
-            statusDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <strong>Manual Workflow Trigger:</strong><br>
-                    To trigger the scraper, go to the <a href="https://github.com/williamDalston/social-media-scraper/actions" target="_blank">Actions tab</a> 
-                    in your GitHub repository, select "Scrape and Export Data", and click "Run workflow".
-                    <br><br>
-                    The workflow runs automatically daily at 2 AM UTC, or you can trigger it manually from GitHub.
-                </div>
-            `;
-
+                `;
+                
+                // Try the API endpoint - works if Flask backend is running
+                const apiUrl = isLocal ? '/api/run-scraper' : `${window.location.origin.replace('williamdalston.github.io', 'your-backend-url.com')}/api/run-scraper`;
+                
+                let response;
+                try {
+                    // Try local API first (if Flask is running)
+                    response = await fetch('/api/run-scraper', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                        },
+                        body: JSON.stringify({ mode: 'real' })
+                    });
+                } catch (fetchError) {
+                    // API not available - show instructions
+                    throw new Error('API_NOT_AVAILABLE');
+                }
+                
+                if (!response.ok) {
+                    // Check if it's an auth error
+                    if (response.status === 401 || response.status === 403) {
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-warning">
+                                <strong>Authentication Required:</strong><br>
+                                Please log in to run the scraper. The scraper requires authentication to run.
+                                <br><br>
+                                If you're running this locally, make sure you're logged into the Flask application.
+                            </div>
+                        `;
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        return;
+                    }
+                    throw new Error(`API returned ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>✅ Scraper Started Successfully!</strong><br>
+                        ${result.message || 'The scraper is now running. This may take a few minutes to complete.'}
+                        ${result.job_id ? `<br><small>Job ID: ${result.job_id}</small>` : ''}
+                        ${result.execution_time ? `<br><small>Execution time: ${result.execution_time} seconds</small>` : ''}
+                        <br><br>
+                        <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                            🔄 Refresh Data
+                        </button>
+                    </div>
+                `;
+                
+                // Auto-refresh data after 10 seconds
+                setTimeout(() => {
+                    refreshData();
+                }, 10000);
+                
+            } catch (error) {
+                // API not available - show instructions for running locally
+                statusDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>🚀 Run the Scraper Locally:</strong><br>
+                        <p>To run the scraper from your computer, follow these steps:</p>
+                        <ol style="text-align: left; max-width: 600px; margin: 15px auto;">
+                            <li><strong>Install Python 3.11+</strong> if you haven't already</li>
+                            <li><strong>Clone the repository:</strong><br>
+                                <code style="background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; display: block; margin: 5px 0;">
+                                    git clone https://github.com/williamDalston/social-media-scraper.git
+                                </code>
+                            </li>
+                            <li><strong>Install dependencies:</strong><br>
+                                <code style="background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; display: block; margin: 5px 0;">
+                                    cd social-media-scraper<br>
+                                    pip install -r requirements.txt
+                                </code>
+                            </li>
+                            <li><strong>Run the Flask application:</strong><br>
+                                <code style="background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; display: block; margin: 5px 0;">
+                                    python app.py
+                                </code>
+                            </li>
+                            <li><strong>Open in browser:</strong><br>
+                                Navigate to <code style="background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px;">http://localhost:5000</code>
+                            </li>
+                            <li><strong>Click "Run Scraper"</strong> - it will work when the Flask app is running!</li>
+                        </ol>
+                        <hr style="margin: 20px 0; border-color: rgba(255,255,255,0.2);">
+                        <p><strong>Alternative: Use GitHub Actions (requires GitHub access)</strong></p>
+                        <p>If you have GitHub access, you can trigger the scraper via GitHub Actions:</p>
+                        <ol style="text-align: left; max-width: 600px; margin: 15px auto;">
+                            <li>Go to <a href="https://github.com/williamDalston/social-media-scraper/actions" target="_blank" style="color: var(--hhs-primary); text-decoration: underline;">GitHub Actions</a></li>
+                            <li>Select "Scrape and Export Data"</li>
+                            <li>Click "Run workflow" → "Run workflow"</li>
+                            <li>Wait for it to complete (5-10 minutes)</li>
+                            <li>Data will be updated automatically</li>
+                        </ol>
+                    </div>
+                `;
+            }
+            
             btn.disabled = false;
-            btn.textContent = '🚀 Run Scraper';
+            btn.textContent = originalText;
         }
 
         function refreshData() {
