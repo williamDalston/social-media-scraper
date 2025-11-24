@@ -151,26 +151,62 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         elif db_path_str.startswith('sqlite://'):
             sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
         else:
-            # Make absolute path
-            abs_path = os.path.abspath(db_path_str) if not os.path.isabs(db_path_str) else db_path_str
-            # Normalize path separators
-            normalized = abs_path.replace('\\', '/').replace('//', '/')
-            sqlite_url = f'sqlite:///{normalized}'
+            # Make absolute path - handle errors gracefully
+            try:
+                if not os.path.isabs(db_path_str):
+                    abs_path = os.path.abspath(db_path_str)
+                else:
+                    abs_path = db_path_str
+                
+                # Validate absolute path
+                if not abs_path or not isinstance(abs_path, str):
+                    raise ValueError(f"Invalid absolute path: {abs_path}")
+                
+                # Normalize path separators - ensure forward slashes only
+                normalized = abs_path.replace('\\', '/')
+                # Remove any double slashes (but keep sqlite:///)
+                while '//' in normalized and not normalized.startswith('sqlite:///'):
+                    normalized = normalized.replace('//', '/')
+                
+                # Construct SQLite URL
+                sqlite_url = f'sqlite:///{normalized}'
+            except Exception as path_error:
+                # Ultimate fallback - use the original path as-is
+                print(f"[INIT_DB ULTIMATE CHECK] Path normalization failed: {path_error}, using simple URL", file=sys.stderr, flush=True)
+                # Just prepend sqlite:/// to the original path
+                sqlite_url = f'sqlite:///{db_path_str.replace(os.sep, "/")}'
         
-        print(f"[INIT_DB ULTIMATE CHECK] SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+        # CRITICAL: Validate URL format before using
+        print(f"[INIT_DB ULTIMATE CHECK] SQLite URL before validation: '{sqlite_url}'", file=sys.stderr, flush=True)
         
-        # Validate URL format
+        if not sqlite_url:
+            raise ValueError("SQLite URL is empty in ultimate check")
+        if not isinstance(sqlite_url, str):
+            raise ValueError(f"SQLite URL must be a string, got {type(sqlite_url).__name__}")
         if not sqlite_url.startswith('sqlite:///'):
-            raise ValueError(f"Invalid SQLite URL in ultimate check: '{sqlite_url}'")
+            # Try to fix it
+            if sqlite_url.startswith('sqlite://'):
+                sqlite_url = sqlite_url.replace('sqlite://', 'sqlite:///', 1)
+            else:
+                sqlite_url = f'sqlite:///{sqlite_url}'
+            print(f"[INIT_DB ULTIMATE CHECK] Fixed SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
         
-        # Create engine immediately
+        # Final validation
+        if not sqlite_url.startswith('sqlite:///'):
+            raise ValueError(f"Invalid SQLite URL format after fixes: '{sqlite_url}' (original: '{db_path_str}')")
+        
+        print(f"[INIT_DB ULTIMATE CHECK] Validated SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+        
+        # Create engine immediately with comprehensive error handling
         try:
+            print(f"[INIT_DB ULTIMATE CHECK] About to call create_engine with: '{sqlite_url}'", file=sys.stderr, flush=True)
             engine = create_engine(
                 sqlite_url,
                 poolclass=NullPool,
                 connect_args={'check_same_thread': False, 'timeout': 20},
                 echo=False
             )
+            print(f"[INIT_DB ULTIMATE CHECK] create_engine call succeeded!", file=sys.stderr, flush=True)
             print(f"[INIT_DB ULTIMATE CHECK] Engine created successfully!", file=sys.stderr, flush=True)
             
             # Import Job model
@@ -189,6 +225,7 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
                 except Exception:
                     pass
             
+            # Base is already defined at module level
             Base.metadata.create_all(engine)
             _ensure_indexes(engine, db_path_str)
             return engine
