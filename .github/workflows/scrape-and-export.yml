@@ -11,10 +11,28 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout repository
+      - name: Checkout code (force latest commit)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch all history to ensure we get latest commits
+          ref: ${{ github.head_ref || github.ref }}   # PR head or branch
+          fetch-depth: 0                              # full history
+          clean: true                                 # clean workspace
+      
+      - name: "CRITICAL: Show exactly which schema.py is on disk"
+        run: |
+          echo "Current commit:"
+          git rev-parse HEAD
+          echo ""
+          echo "=== File timestamp ==="
+          ls -la scraper/schema.py
+          echo ""
+          echo "=== First 25 lines of scraper/schema.py ==="
+          head -25 scraper/schema.py
+          echo ""
+          echo "=== Does the fix exist? ==="
+          grep -n "_construct_sqlite_url\|Using database URL\|init_db(" scraper/schema.py || echo "FIX IS MISSING – OLD FILE IS BEING USED!"
+          echo ""
+          echo "If you don't see '_construct_sqlite_url' above → GitHub Actions is using an old commit!"
       
       - name: Set up Python
         uses: actions/setup-python@v5
