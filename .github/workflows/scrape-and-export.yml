@@ -109,7 +109,7 @@ jobs:
           echo ""
           python scripts/init_db_ci.py || {
             echo ""
-            echo "=== FALLBACK: Trying direct init_db() call ==="
+            echo "=== FALLBACK: Trying direct init_db() call with explicit SQLite URL ==="
             python -c "
             import os
             import sys
@@ -120,24 +120,26 @@ jobs:
                 from scraper.schema import init_db, Base
                 from sqlalchemy import create_engine
                 
-                # Try absolute path first
-                db_path = os.path.abspath('social_media.db')
-                print(f'Attempting with absolute path: {db_path}')
-                engine = init_db(db_path)
-                print('✓ Success with absolute path')
+                # Use explicit SQLite URL format (as recommended)
+                db_url = 'sqlite:///social_media.db'
+                print(f'Attempting with explicit SQLite URL: {db_url}')
+                engine = init_db(db_url)
+                print('✓ Success with explicit SQLite URL')
                 engine.dispose()
             except Exception as e1:
-                print(f'Absolute path failed: {e1}')
+                print(f'Explicit URL failed: {e1}')
                 try:
-                    # Fallback to relative path
-                    print('Attempting with relative path: social_media.db')
-                    engine = init_db('social_media.db')
-                    print('✓ Success with relative path')
+                    # Fallback: absolute path with SQLite URL
+                    db_path = os.path.abspath('social_media.db')
+                    db_url = f'sqlite:///{db_path.replace(os.sep, \"/\")}'
+                    print(f'Attempting with absolute SQLite URL: {db_url}')
+                    engine = init_db(db_url)
+                    print('✓ Success with absolute SQLite URL')
                     engine.dispose()
                 except Exception as e2:
-                    print(f'Relative path failed: {e2}')
-                    # Last resort: direct creation
-                    print('Attempting direct Base.metadata.create_all()')
+                    print(f'Absolute URL failed: {e2}')
+                    # Last resort: direct creation with explicit URL
+                    print('Attempting direct Base.metadata.create_all() with explicit URL')
                     db_path = os.path.abspath('social_media.db')
                     url = f'sqlite:///{db_path.replace(os.sep, \"/\")}'
                     engine = create_engine(url, future=True)

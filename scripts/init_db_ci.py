@@ -33,11 +33,13 @@ def main():
         print()
         
         # Try multiple path formats to ensure compatibility
+        # Priority: Explicit SQLite URL format (recommended) > absolute path > relative path
         print("Step 2: Initializing database...")
         test_paths = [
-            db_path,  # Absolute path
-            'social_media.db',  # Relative path
+            'sqlite:///social_media.db',  # Explicit SQLite URL (recommended - prevents ArgumentError)
             f'sqlite:///{db_path}',  # Full URL with absolute path
+            db_path,  # Absolute path (fallback)
+            'social_media.db',  # Relative path (last resort)
         ]
         
         engine = None
