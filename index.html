@@ -477,10 +477,10 @@
                 <button class="btn btn-success" onclick="exportCustomizedData()" id="exportCustomBtn">
                     📊 Export Custom Data
                 </button>
-                <a href="./public/data/hhs_social_media_data.csv" class="btn btn-success" download id="downloadCsv">
+                <a href="public/data/hhs_social_media_data.csv" class="btn btn-success" download id="downloadCsv">
                     📥 Download All CSV
                 </a>
-                <a href="./public/data/hhs_social_media_data.json" class="btn btn-success" download id="downloadJson">
+                <a href="public/data/hhs_social_media_data.json" class="btn btn-success" download id="downloadJson">
                     📥 Download All JSON
                 </a>
             </div>
@@ -642,13 +642,34 @@
 
         async function loadData() {
             try {
-                const response = await fetch('./public/data/hhs_social_media_data.json');
-                if (!response.ok) {
-                    throw new Error('Data file not found');
+                // Try multiple path variations for GitHub Pages
+                const paths = [
+                    'public/data/hhs_social_media_data.json',
+                    './public/data/hhs_social_media_data.json',
+                    'data/hhs_social_media_data.json',
+                    './data/hhs_social_media_data.json'
+                ];
+                
+                let response = null;
+                let lastError = null;
+                
+                for (const path of paths) {
+                    try {
+                        response = await fetch(path);
+                        if (response.ok) {
+                            const data = await response.json();
+                            dataCache = data;
+                            applyFilters();
+                            return; // Success, exit function
+                        }
+                    } catch (e) {
+                        lastError = e;
+                        continue;
+                    }
                 }
-                const data = await response.json();
-                dataCache = data;
-                applyFilters();
+                
+                // If we get here, all paths failed
+                throw new Error('Data file not found');
             } catch (error) {
                 console.error('Error loading data:', error);
                 document.getElementById('dataTable').innerHTML = `
@@ -657,62 +678,77 @@
                         or wait for the automatic daily update (runs at 2 AM UTC).
                     </div>
                 `;
+                // Show empty state for stats
+                document.getElementById('totalAccounts').textContent = '0';
+                document.getElementById('platformCount').textContent = '0';
+                document.getElementById('totalFollowers').textContent = '0';
+                document.getElementById('lastUpdate').textContent = 'N/A';
             }
         }
 
-        function initializeCustomization() {
+        async function initializeCustomization() {
             // Load available platforms and organizations from accounts JSON
-            fetch('./public/hhs_accounts.json')
-                .then(response => response.json())
+            // Try multiple path variations for GitHub Pages
+            const accountPaths = [
+                'public/hhs_accounts.json',
+                './public/hhs_accounts.json',
+                'hhs_accounts.json',
+                './hhs_accounts.json'
+            ];
+            
+            let accounts = [];
+            for (const path of accountPaths) {
+                try {
+                    const response = await fetch(path);
+                    if (response.ok) {
+                        accounts = await response.json();
+                        break;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+            
+            if (accounts.length === 0) {
+                // Fallback to empty arrays if file not found
+                console.warn('Could not load accounts file, using empty defaults');
+            }
+            
+            const platforms = accounts.length > 0 ? [...new Set(accounts.map(a => a.platform))] : ['X', 'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'Flickr', 'Truth Social'];
+            const organizations = accounts.length > 0 ? [...new Set(accounts.map(a => a.organization))] : [];
                 .then(accounts => {
                     const platforms = [...new Set(accounts.map(a => a.platform))];
                     const organizations = [...new Set(accounts.map(a => a.organization))];
 
                     // Populate platform checkboxes
-                    const platformContainer = document.getElementById('platformCheckboxes');
-                    platforms.sort().forEach(platform => {
-                        const div = document.createElement('div');
-                        div.className = 'checkbox-item';
-                        div.innerHTML = `
-                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
-                                   onchange="updateFilters()">
-                            <label for="platform-${platform}">${platform}</label>
-                        `;
-                        platformContainer.appendChild(div);
-                    });
+            const platformContainer = document.getElementById('platformCheckboxes');
+            platforms.sort().forEach(platform => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
+                           onchange="updateFilters()">
+                    <label for="platform-${platform}">${platform}</label>
+                `;
+                platformContainer.appendChild(div);
+            });
 
-                    // Populate organization checkboxes
-                    const orgContainer = document.getElementById('organizationCheckboxes');
-                    organizations.sort().forEach(org => {
-                        const div = document.createElement('div');
-                        div.className = 'checkbox-item';
-                        div.innerHTML = `
-                            <input type="checkbox" id="org-${org.replace(/\s+/g, '-')}" value="${org}" checked 
-                                   onchange="updateFilters()">
-                            <label for="org-${org.replace(/\s+/g, '-')}">${org}</label>
-                        `;
-                        orgContainer.appendChild(div);
-                    });
+            // Populate organization checkboxes
+            const orgContainer = document.getElementById('organizationCheckboxes');
+            organizations.sort().forEach(org => {
+                const div = document.createElement('div');
+                div.className = 'checkbox-item';
+                div.innerHTML = `
+                    <input type="checkbox" id="org-${org.replace(/\s+/g, '-')}" value="${org}" checked 
+                           onchange="updateFilters()">
+                    <label for="org-${org.replace(/\s+/g, '-')}">${org}</label>
+                `;
+                orgContainer.appendChild(div);
+            });
 
-                    // Initialize active filters
-                    activeFilters.platforms = platforms;
-                    activeFilters.organizations = organizations;
-                })
-                .catch(() => {
-                    // If accounts file not available, use defaults
-                    const defaultPlatforms = ['X', 'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'Flickr', 'Truth Social'];
-                    const platformContainer = document.getElementById('platformCheckboxes');
-                    defaultPlatforms.forEach(platform => {
-                        const div = document.createElement('div');
-                        div.className = 'checkbox-item';
-                        div.innerHTML = `
-                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
-                                   onchange="updateFilters()">
-                            <label for="platform-${platform}">${platform}</label>
-                        `;
-                        platformContainer.appendChild(div);
-                    });
-                });
+            // Initialize active filters
+            activeFilters.platforms = platforms;
+            activeFilters.organizations = organizations;
         }
 
         function toggleCustomization() {
