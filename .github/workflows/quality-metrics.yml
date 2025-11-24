@@ -28,7 +28,7 @@ jobs:
         python scripts/generate_quality_report.py
     
     - name: Upload quality report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: quality-report
         path: quality_report.json
