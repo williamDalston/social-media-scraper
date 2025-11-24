@@ -11,12 +11,20 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout code (force latest commit)
+      - name: "FORCE CHECKOUT LATEST CODE + PROOF"
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref }}   # PR head or branch
-          fetch-depth: 0                              # full history
-          clean: true                                 # clean workspace
+          ref: ${{ github.head_ref || github.ref }}
+          fetch-depth: 0
+          clean: true
+      
+      - name: "VERIFY schema.py IS REALLY NEW"
+        run: |
+          echo "Commit being used: $(git rev-parse HEAD)"
+          echo "=== First 30 lines of scraper/schema.py ==="
+          head -30 scraper/schema.py
+          echo "=== Searching for the fix ==="
+          grep -n "_construct_sqlite_url\|Using database URL" scraper/schema.py && echo "NEW CODE FOUND" || echo "OLD CODE STILL HERE – THIS IS THE PROBLEM"
       
       - name: "CRITICAL: Show exactly which schema.py is on disk"
         run: |
