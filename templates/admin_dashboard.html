@@ -4,7 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - HHS Social Media Scraper</title>
+    <!-- USWDS Fonts - Source Sans Pro for HHS compliance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        /* HHS Official Color Palette - USWDS Compliant */
+        :root {
+            --hhs-primary: #0071BC;
+            --hhs-primary-dark: #205493;
+            --hhs-primary-darker: #112E51;
+            --hhs-secondary: #02BFE7;
+            --hhs-success: #2E8540;
+            --hhs-warning: #FDB81E;
+            --hhs-danger: #E31C3D;
+            --hhs-gray-light: #F1F1F1;
+            --hhs-gray-medium: #D6D7D9;
+            --hhs-gray-dark: #5B616B;
+            --hhs-text-primary: #212121;
+            --hhs-text-secondary: #5B616B;
+            --hhs-white: #FFFFFF;
+            --hhs-black: #000000;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,17 +34,55 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            font-family: 'Source Sans Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: var(--hhs-gray-light);
+            color: var(--hhs-text-primary);
             line-height: 1.6;
         }
 
+        /* Official US Government Banner */
+        .usa-banner {
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #d6d7d9;
+            font-size: 12px;
+            padding: 8px 0;
+        }
+
+        .usa-banner__inner {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .usa-banner__flag {
+            width: 16px;
+            height: 11px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        .usa-banner__text {
+            color: #212121;
+            margin: 0;
+        }
+
+        .usa-banner__text a {
+            color: #0071bc;
+            text-decoration: underline;
+        }
+
+        .usa-banner__text a:hover {
+            color: #205493;
+        }
+
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--hhs-primary-darker);
             color: white;
             padding: 2rem;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
 
         .header h1 {
@@ -48,23 +108,24 @@
         }
 
         .card {
-            background: white;
-            border-radius: 8px;
+            background: var(--hhs-white);
+            border-radius: 4px;
             padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid var(--hhs-gray-medium);
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
         .card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         }
 
         .card h2 {
             font-size: 1.2rem;
             margin-bottom: 1rem;
-            color: #667eea;
-            border-bottom: 2px solid #f0f0f0;
+            color: var(--hhs-primary-dark);
+            border-bottom: 2px solid var(--hhs-gray-medium);
             padding-bottom: 0.5rem;
         }
 
@@ -90,21 +151,21 @@
         }
 
         .status-healthy {
-            color: #10b981;
+            color: var(--hhs-success);
         }
 
         .status-warning {
-            color: #f59e0b;
+            color: var(--hhs-warning);
         }
 
         .status-error {
-            color: #ef4444;
+            color: var(--hhs-danger);
         }
 
         .progress-bar {
             width: 100%;
             height: 8px;
-            background: #e5e7eb;
+            background: var(--hhs-gray-medium);
             border-radius: 4px;
             overflow: hidden;
             margin-top: 0.5rem;
@@ -112,16 +173,16 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: var(--hhs-primary);
             transition: width 0.3s;
         }
 
         .progress-fill.warning {
-            background: linear-gradient(90deg, #f59e0b, #f97316);
+            background: var(--hhs-warning);
         }
 
         .progress-fill.error {
-            background: linear-gradient(90deg, #ef4444, #dc2626);
+            background: var(--hhs-danger);
         }
 
         .metrics-grid {
@@ -141,32 +202,32 @@
         .metric-value {
             font-size: 2rem;
             font-weight: 700;
-            color: #667eea;
+            color: var(--hhs-primary);
             margin-bottom: 0.25rem;
         }
 
         .metric-label {
             font-size: 0.875rem;
-            color: #666;
+            color: var(--hhs-text-secondary);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .refresh-btn {
-            background: #667eea;
+            background: var(--hhs-primary);
             color: white;
             border: none;
             padding: 0.75rem 1.5rem;
-            border-radius: 6px;
+            border-radius: 4px;
             cursor: pointer;
             font-size: 1rem;
-            font-weight: 500;
+            font-weight: 600;
             transition: background 0.2s;
             margin-top: 1rem;
         }
 
         .refresh-btn:hover {
-            background: #5568d3;
+            background: var(--hhs-primary-dark);
         }
 
         .refresh-btn:active {
@@ -198,11 +259,12 @@
         .platform-badge {
             display: inline-block;
             padding: 0.25rem 0.75rem;
-            background: #e0e7ff;
-            color: #4338ca;
-            border-radius: 12px;
+            background: var(--hhs-gray-light);
+            color: var(--hhs-primary-dark);
+            border-radius: 4px;
             font-size: 0.875rem;
             margin: 0.25rem;
+            border: 1px solid var(--hhs-gray-medium);
         }
 
         @keyframes pulse {
@@ -220,9 +282,19 @@
     </style>
 </head>
 <body>
+    <!-- Official US Government Banner -->
+    <div class="usa-banner" role="banner">
+        <div class="usa-banner__inner">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 57 32'%3E%3Cpath fill='%23B22234' d='M0 0h57v32H0z'/%3E%3Cpath fill='%23FFFFFF' d='M0 0h57v2.4H0zm0 4.8h57v2.4H0zm0 4.8h57v2.4H0zm0 4.8h57v2.4H0zm0 4.8h57v2.4H0zm0 4.8h57v2.4H0zm0 4.8h57v2.4H0z'/%3E%3Cpath fill='%233C3B6E' d='M0 0h22.8v16H0z'/%3E%3Cpath fill='%23FFFFFF' d='M2.3 1.6l1.1 2.2 2.5.4-1.8 1.8.4 2.5-2.2-1.1-2.2 1.1.4-2.5-1.8-1.8 2.5-.4zm0 7.2l1.1 2.2 2.5.4-1.8 1.8.4 2.5-2.2-1.1-2.2 1.1.4-2.5-1.8-1.8 2.5-.4zm7.2-7.2l1.1 2.2 2.5.4-1.8 1.8.4 2.5-2.2-1.1-2.2 1.1.4-2.5-1.8-1.8 2.5-.4zm0 7.2l1.1 2.2 2.5.4-1.8 1.8.4 2.5-2.2-1.1-2.2 1.1.4-2.5-1.8-1.8 2.5-.4zm7.2-7.2l1.1 2.2 2.5.4-1.8 1.8.4 2.5-2.2-1.1-2.2 1.1.4-2.5-1.8-1.8 2.5-.4z'/%3E%3C/svg%3E" alt="US Flag" class="usa-banner__flag" aria-hidden="true">
+            <p class="usa-banner__text">
+                An official website of the <a href="https://www.hhs.gov" target="_blank" rel="noopener noreferrer">United States government</a>
+            </p>
+        </div>
+    </div>
+
     <div class="header">
         <h1>🔍 Admin Dashboard</h1>
-        <p>System Monitoring & Observability</p>
+        <p>System Monitoring & Observability - U.S. Department of Health & Human Services</p>
     </div>
 
     <div class="container">

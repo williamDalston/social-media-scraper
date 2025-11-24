@@ -96,6 +96,9 @@ class FacebookScraper(BasePlatformScraper):
         # Get post count (would need separate API call for recent posts)
         posts = 0  # Graph API doesn't return total post count directly
         
+        # Get metadata from snippet
+        snippet = data.get('snippet', {}) or {}
+        
         return {
             'followers_count': int(followers),
             'following_count': 0,  # Pages don't have following
@@ -103,6 +106,12 @@ class FacebookScraper(BasePlatformScraper):
             'likes_count': 0,  # Would need to fetch posts
             'comments_count': 0,  # Would need to fetch posts
             'shares_count': 0,  # Would need to fetch posts
+            'bio_text': data.get('about', '') or data.get('description', ''),
+            'verified_status': 'verified' if data.get('is_verified') else None,
+            'account_category': data.get('category', ''),
+            'profile_image_url': data.get('picture', {}).get('data', {}).get('url', '') if isinstance(data.get('picture'), dict) else '',
+            'account_created_date': None,  # Graph API doesn't provide this
+            'account_type': 'page',
         }
     
     def _scrape_via_web(self, account_url: str) -> Dict[str, Any]:
@@ -184,6 +193,22 @@ class FacebookScraper(BasePlatformScraper):
                 if match:
                     followers = parse_follower_count(match.group(1)) or 0
             
+            # Extract metadata
+            bio_text = ''
+            verified_status = None
+            profile_image_url = ''
+            
+            # Try to extract metadata from meta tags
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'description' in name.lower() and content:
+                    bio_text = content
+                
+                if 'image' in name.lower() and content:
+                    profile_image_url = content
+            
             # If we have data, return it
             if followers > 0:
                 return {
@@ -193,6 +218,12 @@ class FacebookScraper(BasePlatformScraper):
                     'likes_count': likes,
                     'comments_count': 0,
                     'shares_count': 0,
+                    'bio_text': bio_text,
+                    'verified_status': verified_status,
+                    'profile_image_url': profile_image_url,
+                    'account_created_date': None,
+                    'account_category': None,
+                    'account_type': 'page',
                 }
             
             # If no data from static HTML, try browser automation (dynamic content)
@@ -247,6 +278,12 @@ class FacebookScraper(BasePlatformScraper):
                                 'likes_count': likes,
                                 'comments_count': 0,
                                 'shares_count': 0,
+                                'bio_text': bio_text,
+                                'verified_status': verified_status,
+                                'profile_image_url': profile_image_url,
+                                'account_created_date': None,
+                                'account_category': None,
+                                'account_type': 'page',
                             }
                 except Exception as e:
                     logger.warning(f"Browser automation failed for Facebook page: {e}")
@@ -259,6 +296,12 @@ class FacebookScraper(BasePlatformScraper):
                 'likes_count': likes,
                 'comments_count': 0,
                 'shares_count': 0,
+                'bio_text': '',
+                'verified_status': None,
+                'profile_image_url': '',
+                'account_created_date': None,
+                'account_category': None,
+                'account_type': 'page',
             }
             
         except AccountNotFoundError:

@@ -184,6 +184,10 @@ def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_
                 data = scraper.scrape(account)
                 
                 if data:
+                    # Update account metadata from scraped data
+                    from scraper.utils.metrics_calculator import update_account_metadata
+                    update_account_metadata(account, data)
+                    
                     snapshot = FactFollowersSnapshot(
                         account_key=account.account_key,
                         snapshot_date=today,
@@ -195,9 +199,14 @@ def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_
                         shares_count=data.get('shares_count', 0),
                         subscribers_count=data.get('subscribers_count', 0),  # For YouTube
                         video_views=data.get('views_count', 0),  # For YouTube
-                        engagements_total=0
+                        engagements_total=0,
+                        videos_count=data.get('videos_count', 0)  # For YouTube
                     )
                     snapshot.engagements_total = snapshot.likes_count + snapshot.comments_count + snapshot.shares_count
+                    
+                    # Calculate additional metrics
+                    from scraper.utils.metrics_calculator import calculate_snapshot_metrics
+                    calculate_snapshot_metrics(snapshot, session, account, data)
                     
                     session.add(snapshot)
                     success_count += 1

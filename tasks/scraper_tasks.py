@@ -84,6 +84,10 @@ def scrape_account(self, account_key, mode='real', db_path=None):
             snapshot_date=today
         ).first()
         
+        # Update account metadata from scraped data
+        from scraper.utils.metrics_calculator import update_account_metadata, calculate_snapshot_metrics
+        update_account_metadata(account, data)
+        
         if existing:
             # Update existing snapshot
             existing.followers_count = data.get('followers_count', 0)
@@ -94,7 +98,11 @@ def scrape_account(self, account_key, mode='real', db_path=None):
             existing.shares_count = data.get('shares_count', 0)
             existing.subscribers_count = data.get('subscribers_count', 0)  # For YouTube
             existing.video_views = data.get('views_count', 0)  # For YouTube
+            existing.videos_count = data.get('videos_count', 0)  # For YouTube
             existing.engagements_total = existing.likes_count + existing.comments_count + existing.shares_count
+            
+            # Recalculate metrics
+            calculate_snapshot_metrics(existing, session, account, data)
         else:
             # Create new snapshot
             snapshot = FactFollowersSnapshot(
@@ -108,9 +116,13 @@ def scrape_account(self, account_key, mode='real', db_path=None):
                 shares_count=data.get('shares_count', 0),
                 subscribers_count=data.get('subscribers_count', 0),  # For YouTube
                 video_views=data.get('views_count', 0),  # For YouTube
+                videos_count=data.get('videos_count', 0),  # For YouTube
                 engagements_total=0
             )
             snapshot.engagements_total = snapshot.likes_count + snapshot.comments_count + snapshot.shares_count
+            
+            # Calculate additional metrics
+            calculate_snapshot_metrics(snapshot, session, account, data)
             session.add(snapshot)
         
         session.commit()

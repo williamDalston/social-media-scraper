@@ -206,6 +206,38 @@ class XScraper(BasePlatformScraper):
                     if match:
                         posts = parse_follower_count(match.group(1)) or 0
             
+            # Extract metadata
+            bio_text = ''
+            verified_status = None
+            profile_image_url = ''
+            
+            # Try to extract bio from meta tags (already defined above)
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'description' in name.lower() and content:
+                    bio_text = content
+                
+                if 'image' in name.lower() and 'profile' in name.lower() and content:
+                    profile_image_url = content
+            
+            # Check for verified badge (X verification)
+            # Look for verified indicators in meta tags or JSON
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'verified' in name.lower() and content:
+                    if 'blue' in content.lower():
+                        verified_status = 'Blue'
+                    elif 'org' in content.lower() or 'organization' in content.lower():
+                        verified_status = 'Org'
+                    elif 'gov' in content.lower() or 'government' in content.lower():
+                        verified_status = 'Gov'
+                    else:
+                        verified_status = 'Verified'
+            
             # If we have some data, return it
             if followers > 0 or following > 0 or posts > 0:
                 return {
@@ -215,6 +247,11 @@ class XScraper(BasePlatformScraper):
                     'likes_count': likes,  # Would need to fetch individual tweets
                     'comments_count': 0,  # Would need to fetch individual tweets
                     'shares_count': 0,  # Would need to fetch individual tweets
+                    'bio_text': bio_text,
+                    'verified_status': verified_status,
+                    'profile_image_url': profile_image_url,
+                    'account_created_date': None,  # X doesn't expose this publicly
+                    'account_category': None,
                 }
             
             # If no data from static HTML, try browser automation (dynamic content)
@@ -294,6 +331,11 @@ class XScraper(BasePlatformScraper):
                                 'likes_count': likes,
                                 'comments_count': 0,
                                 'shares_count': 0,
+                                'bio_text': bio_text,
+                                'verified_status': verified_status,
+                                'profile_image_url': profile_image_url,
+                                'account_created_date': None,
+                                'account_category': None,
                             }
                 except Exception as e:
                     logger.warning(f"Browser automation failed for X account: {e}")
@@ -307,6 +349,11 @@ class XScraper(BasePlatformScraper):
                 'likes_count': 0,
                 'comments_count': 0,
                 'shares_count': 0,
+                'bio_text': '',
+                'verified_status': None,
+                'profile_image_url': '',
+                'account_created_date': None,
+                'account_category': None,
             }
             
         except AccountNotFoundError:

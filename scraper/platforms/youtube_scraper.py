@@ -170,15 +170,29 @@ class YouTubeScraper(BasePlatformScraper):
         channel = data['items'][0]
         stats = channel.get('statistics', {})
         
+        video_count = int(stats.get('videoCount', 0))
+        view_count = int(stats.get('viewCount', 0))
+        
+        # Get channel snippet for metadata
+        snippet = channel.get('snippet', {})
+        
         return {
             'followers_count': 0,  # YouTube doesn't have followers
             'following_count': 0,
             'subscribers_count': int(stats.get('subscriberCount', 0)),
-            'posts_count': int(stats.get('videoCount', 0)),
+            'posts_count': video_count,  # Use video_count for posts_count
+            'videos_count': video_count,
             'likes_count': 0,  # Would need to fetch videos for this
             'comments_count': 0,  # Would need to fetch videos for this
             'shares_count': 0,
-            'views_count': int(stats.get('viewCount', 0)),
+            'views_count': view_count,  # Current view count (deprecated, use total_video_views)
+            'total_video_views': view_count,  # Lifetime video views
+            # Metadata
+            'bio_text': snippet.get('description', ''),
+            'account_created_date': None,  # YouTube API doesn't provide this
+            'verified_status': 'verified' if channel.get('brandingSettings', {}).get('channel', {}).get('isBrandedChannel') else None,
+            'account_category': snippet.get('categoryId', ''),
+            'profile_image_url': snippet.get('thumbnails', {}).get('high', {}).get('url', ''),
         }
     
     def _scrape_via_web(self, account_url: str) -> Dict[str, Any]:

@@ -144,6 +144,21 @@ class LinkedInScraper(BasePlatformScraper):
                 if match:
                     followers = parse_follower_count(match.group(1)) or 0
             
+            # Extract metadata
+            bio_text = ''
+            profile_image_url = ''
+            
+            # Try to extract metadata from meta tags
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'description' in name.lower() and content:
+                    bio_text = content
+                
+                if 'image' in name.lower() and content:
+                    profile_image_url = content
+            
             # If we have data, return it
             if followers > 0:
                 return {
@@ -153,6 +168,12 @@ class LinkedInScraper(BasePlatformScraper):
                     'likes_count': 0,
                     'comments_count': 0,
                     'shares_count': 0,
+                    'bio_text': bio_text,
+                    'verified_status': None,  # LinkedIn doesn't expose verification publicly
+                    'profile_image_url': profile_image_url,
+                    'account_created_date': None,  # LinkedIn doesn't expose this
+                    'account_category': None,
+                    'account_type': 'company',
                 }
             
             # If no data from static HTML, try browser automation (dynamic content)
@@ -210,6 +231,12 @@ class LinkedInScraper(BasePlatformScraper):
                                 'likes_count': 0,
                                 'comments_count': 0,
                                 'shares_count': 0,
+                                'bio_text': bio_text,
+                                'verified_status': None,
+                                'profile_image_url': profile_image_url,
+                                'account_created_date': None,
+                                'account_category': None,
+                                'account_type': 'company',
                             }
                 except Exception as e:
                     logger.warning(f"Browser automation failed for LinkedIn page: {e}")
@@ -223,6 +250,12 @@ class LinkedInScraper(BasePlatformScraper):
                 'likes_count': 0,
                 'comments_count': 0,
                 'shares_count': 0,
+                'bio_text': '',
+                'verified_status': None,
+                'profile_image_url': '',
+                'account_created_date': None,
+                'account_category': None,
+                'account_type': 'company',
             }
             
         except AccountNotFoundError:

@@ -206,7 +206,28 @@ class TruthScraper(BasePlatformScraper):
                     'likes_count': 0,
                     'comments_count': 0,
                     'shares_count': 0,
+                    'bio_text': '',
+                    'verified_status': None,
+                    'profile_image_url': '',
+                    'account_created_date': None,
+                    'account_category': None,
+                    'account_type': 'personal',
                 }
+            
+            # Extract metadata
+            bio_text = ''
+            profile_image_url = ''
+            
+            # Try to extract metadata from meta tags
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'description' in name.lower() and content:
+                    bio_text = content
+                
+                if 'image' in name.lower() and content:
+                    profile_image_url = content
             
             return {
                 'followers_count': followers,
@@ -215,6 +236,12 @@ class TruthScraper(BasePlatformScraper):
                 'likes_count': 0,  # Would need to fetch individual posts
                 'comments_count': 0,  # Would need to fetch individual posts
                 'shares_count': 0,  # Would need to fetch individual posts
+                'bio_text': bio_text,
+                'verified_status': None,
+                'profile_image_url': profile_image_url,
+                'account_created_date': None,
+                'account_category': None,
+                'account_type': 'personal',
             }
             
         except AccountNotFoundError:

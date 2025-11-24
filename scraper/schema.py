@@ -27,6 +27,13 @@ class DimAccount(Base):
 
     # Platform specific extras (stored as JSON or separate columns if critical)
     verified_status = Column(String) # X: None, Blue, Org, Gov
+    
+    # Account metadata
+    account_created_date = Column(Date)  # When account was created
+    account_category = Column(String)  # Platform-specific category (e.g., Government, Organization)
+    bio_text = Column(Text)  # Account bio/description
+    bio_link = Column(String)  # Link in bio (Instagram, X, etc.)
+    profile_image_url = Column(String)  # Profile picture URL
 
     def __repr__(self):
         return f"<DimAccount(platform='{self.platform}', handle='{self.handle}')>"
@@ -55,6 +62,16 @@ class FactFollowersSnapshot(Base):
     shares_count = Column(Integer)
     video_views = Column(Integer)
     engagements_total = Column(Integer)
+    
+    # Calculated metrics (computed from raw data)
+    engagement_rate = Column(Float)  # (engagements / followers) * 100
+    follower_growth_rate = Column(Float)  # Daily/weekly growth %
+    follower_growth_absolute = Column(Integer)  # Net follower change
+    posts_per_day = Column(Float)  # Average posting frequency
+    
+    # Video-specific metrics (YouTube)
+    total_video_views = Column(Integer)  # Lifetime video views (YouTube)
+    average_views_per_video = Column(Float)  # Calculated: total_views / video_count
 
     account = relationship("DimAccount")
 
@@ -207,6 +224,12 @@ def _ensure_indexes(engine, db_path):
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_date_desc ON fact_followers_snapshot(snapshot_date DESC)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_followers ON fact_followers_snapshot(followers_count)",),
         ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_engagement ON fact_followers_snapshot(engagements_total)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_engagement_rate ON fact_followers_snapshot(engagement_rate)",),
+        ("CREATE INDEX IF NOT EXISTS ix_fact_snapshot_growth_rate ON fact_followers_snapshot(follower_growth_rate)",),
+        
+        # DimAccount indexes for new fields
+        ("CREATE INDEX IF NOT EXISTS ix_dim_account_created_date ON dim_account(account_created_date)",),
+        ("CREATE INDEX IF NOT EXISTS ix_dim_account_category ON dim_account(account_category)",),
         
         # FactSocialPost indexes (if table exists)
         ("CREATE INDEX IF NOT EXISTS ix_fact_post_account_key ON fact_social_post(account_key)",),

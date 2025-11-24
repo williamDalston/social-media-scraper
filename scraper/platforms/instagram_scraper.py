@@ -210,6 +210,37 @@ class InstagramScraper(BasePlatformScraper):
                     if match:
                         posts = parse_follower_count(match.group(1)) or 0
             
+            # Extract metadata
+            bio_text = ''
+            bio_link = ''
+            profile_image_url = ''
+            account_type = None
+            verified_status = None
+            
+            # Extract from window._sharedData if available
+            scripts = soup.find_all('script')
+            for script in scripts:
+                if script.string and 'window._sharedData' in script.string:
+                    try:
+                        match = re.search(r'window\._sharedData\s*=\s*({.+?});', script.string, re.DOTALL)
+                        if match:
+                            import json
+                            data = json.loads(match.group(1))
+                            
+                            if 'entry_data' in data and 'ProfilePage' in data['entry_data']:
+                                profile = data['entry_data']['ProfilePage'][0]
+                                if 'graphql' in profile and 'user' in profile['graphql']:
+                                    user = profile['graphql']['user']
+                                    
+                                    bio_text = user.get('biography', '')
+                                    bio_link = user.get('external_url', '')
+                                    profile_image_url = user.get('profile_pic_url_hd', '') or user.get('profile_pic_url', '')
+                                    account_type = 'business' if user.get('is_business_account') else 'personal'
+                                    verified_status = 'verified' if user.get('is_verified') else None
+                                    break
+                    except (json.JSONDecodeError, Exception) as e:
+                        logger.debug(f"Error parsing _sharedData for metadata: {e}")
+            
             # If we have some data, return it
             if followers > 0 or following > 0 or posts > 0:
                 return {
@@ -219,6 +250,13 @@ class InstagramScraper(BasePlatformScraper):
                     'likes_count': 0,  # Would need to fetch individual posts
                     'comments_count': 0,  # Would need to fetch individual posts
                     'shares_count': 0,
+                    'bio_text': bio_text,
+                    'bio_link': bio_link,
+                    'profile_image_url': profile_image_url,
+                    'account_type': account_type,
+                    'verified_status': verified_status,
+                    'account_created_date': None,  # Instagram doesn't expose this publicly
+                    'account_category': None,
                 }
             
             # If no data from static HTML, try browser automation (dynamic content)
@@ -274,6 +312,34 @@ class InstagramScraper(BasePlatformScraper):
                         
                         if followers > 0 or following > 0 or posts > 0:
                             logger.info(f"Successfully extracted data using browser automation for Instagram account")
+                            # Extract metadata from rendered page
+                            bio_text = ''
+                            bio_link = ''
+                            profile_image_url = ''
+                            account_type = None
+                            verified_status = None
+                            
+                            scripts = soup.find_all('script')
+                            for script in scripts:
+                                if script.string and 'window._sharedData' in script.string:
+                                    try:
+                                        match = re.search(r'window\._sharedData\s*=\s*({.+?});', script.string, re.DOTALL)
+                                        if match:
+                                            import json
+                                            data = json.loads(match.group(1))
+                                            if 'entry_data' in data and 'ProfilePage' in data['entry_data']:
+                                                profile = data['entry_data']['ProfilePage'][0]
+                                                if 'graphql' in profile and 'user' in profile['graphql']:
+                                                    user = profile['graphql']['user']
+                                                    bio_text = user.get('biography', '')
+                                                    bio_link = user.get('external_url', '')
+                                                    profile_image_url = user.get('profile_pic_url_hd', '') or user.get('profile_pic_url', '')
+                                                    account_type = 'business' if user.get('is_business_account') else 'personal'
+                                                    verified_status = 'verified' if user.get('is_verified') else None
+                                                    break
+                                    except (json.JSONDecodeError, Exception):
+                                        pass
+                            
                             return {
                                 'followers_count': followers,
                                 'following_count': following,
@@ -281,6 +347,13 @@ class InstagramScraper(BasePlatformScraper):
                                 'likes_count': 0,
                                 'comments_count': 0,
                                 'shares_count': 0,
+                                'bio_text': bio_text,
+                                'bio_link': bio_link,
+                                'profile_image_url': profile_image_url,
+                                'account_type': account_type,
+                                'verified_status': verified_status,
+                                'account_created_date': None,
+                                'account_category': None,
                             }
                 except Exception as e:
                     logger.warning(f"Browser automation failed for Instagram account: {e}")
@@ -294,6 +367,12 @@ class InstagramScraper(BasePlatformScraper):
                 'likes_count': 0,
                 'comments_count': 0,
                 'shares_count': 0,
+                'bio_text': '',
+                'bio_link': '',
+                'profile_image_url': '',
+                'verified_status': None,
+                'account_created_date': None,
+                'account_category': None,
             }
             
         except AccountNotFoundError:

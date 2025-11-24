@@ -135,6 +135,10 @@ def scrape_account_parallel(
         data = scraper.scrape(account)
         
         if data:
+            # Update account metadata from scraped data
+            from scraper.utils.metrics_calculator import update_account_metadata
+            update_account_metadata(account, data)
+            
             # Create snapshot
             from scraper.schema import FactFollowersSnapshot
             snapshot = FactFollowersSnapshot(
@@ -146,13 +150,20 @@ def scrape_account_parallel(
                 likes_count=data.get('likes_count', 0),
                 comments_count=data.get('comments_count', 0),
                 shares_count=data.get('shares_count', 0),
-                engagements_total=0
+                subscribers_count=data.get('subscribers_count', 0),  # For YouTube
+                video_views=data.get('views_count', 0),  # For YouTube
+                engagements_total=0,
+                videos_count=data.get('videos_count', 0)  # For YouTube
             )
             snapshot.engagements_total = (
                 snapshot.likes_count + 
                 snapshot.comments_count + 
                 snapshot.shares_count
             )
+            
+            # Calculate additional metrics
+            from scraper.utils.metrics_calculator import calculate_snapshot_metrics
+            calculate_snapshot_metrics(snapshot, session, account, data)
             
             session.add(snapshot)
             # Use batch commits for better performance (commit every 10 accounts or at end)

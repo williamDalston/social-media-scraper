@@ -174,6 +174,22 @@ class FlickrScraper(BasePlatformScraper):
                     if match:
                         photos = int(match.group(1).replace(',', ''))
             
+            # Extract metadata
+            bio_text = ''
+            profile_image_url = ''
+            
+            # Try to extract metadata from meta tags or page content
+            meta_tags = soup.find_all('meta')
+            for tag in meta_tags:
+                name = tag.get('name', '') or tag.get('property', '')
+                content = tag.get('content', '')
+                
+                if 'description' in name.lower() and content:
+                    bio_text = content
+                
+                if 'image' in name.lower() and content:
+                    profile_image_url = content
+            
             # If we still don't have data
             if followers == 0 and following == 0 and photos == 0:
                 logger.warning(f"Could not extract data from Flickr page. Page structure may have changed.")
@@ -184,6 +200,12 @@ class FlickrScraper(BasePlatformScraper):
                     'likes_count': 0,
                     'comments_count': 0,
                     'shares_count': 0,
+                    'bio_text': '',
+                    'verified_status': None,
+                    'profile_image_url': '',
+                    'account_created_date': None,
+                    'account_category': None,
+                    'account_type': 'personal',
                 }
             
             return {
@@ -193,6 +215,12 @@ class FlickrScraper(BasePlatformScraper):
                 'likes_count': 0,  # Would need to fetch individual photos
                 'comments_count': 0,  # Would need to fetch individual photos
                 'shares_count': 0,
+                'bio_text': bio_text,
+                'verified_status': None,
+                'profile_image_url': profile_image_url,
+                'account_created_date': None,  # Flickr doesn't expose this publicly
+                'account_category': None,
+                'account_type': 'personal',
             }
             
         except AccountNotFoundError:

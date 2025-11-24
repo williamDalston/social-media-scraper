@@ -219,7 +219,17 @@ class TikTokScraper(BasePlatformScraper):
                     'likes_count': 0,
                     'comments_count': 0,
                     'shares_count': 0,
+                    'bio_text': '',
+                    'verified_status': None,
+                    'profile_image_url': '',
+                    'account_created_date': None,
+                    'account_category': None,
+                    'account_type': 'personal',
                 }
+            
+            # Extract metadata
+            bio_text = ''
+            profile_image_url = ''
             
             return {
                 'followers_count': followers,
@@ -228,6 +238,12 @@ class TikTokScraper(BasePlatformScraper):
                 'likes_count': likes,
                 'comments_count': 0,  # Would need to fetch individual videos
                 'shares_count': 0,  # Would need to fetch individual videos
+                'bio_text': bio_text,
+                'verified_status': None,
+                'profile_image_url': profile_image_url,
+                'account_created_date': None,
+                'account_category': None,
+                'account_type': 'personal',
             }
             
         except AccountNotFoundError:
