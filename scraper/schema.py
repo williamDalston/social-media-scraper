@@ -168,11 +168,19 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         elif db_path.startswith('sqlite://'):
             sqlite_url = db_path.replace('sqlite://', 'sqlite:///', 1)
         else:
-            sqlite_url = f'sqlite:///{db_path}'
+            # Convert to absolute path for CI/CD compatibility
+            if not os.path.isabs(db_path):
+                # Relative path - make it absolute
+                abs_path = os.path.abspath(db_path)
+            else:
+                abs_path = db_path
+            # Ensure proper SQLite URL format with forward slashes
+            sqlite_url = f'sqlite:///{abs_path.replace(os.sep, "/")}'
         
         # Log explicitly to help debug CI/CD issues
         logger.info(f"[INIT_DB] Force-detected SQLite from .db extension: db_path='{db_path}' -> sqlite_url='{sqlite_url}'")
         print(f"[INIT_DB DEBUG] Detected .db file: '{db_path}' -> '{sqlite_url}'", file=sys.stderr)
+        print(f"[INIT_DB DEBUG] Absolute path: {os.path.abspath(db_path) if not os.path.isabs(db_path) else db_path}", file=sys.stderr)
         try:
             engine = create_engine(
                 sqlite_url,
