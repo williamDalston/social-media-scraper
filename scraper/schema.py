@@ -114,6 +114,12 @@ class FactSocialPost(Base):
     account = relationship("DimAccount")
 
 # Import Job model to ensure it's included in schema
+
+# Module-level test to verify the file is being loaded
+import sys
+sys.stderr.write("[SCHEMA.PY] Module loaded successfully\n")
+sys.stderr.flush()
+
 def init_db(db_path='social_media.db', enable_profiling: bool = False):
     """
     Initialize database with optimized connection pooling.
