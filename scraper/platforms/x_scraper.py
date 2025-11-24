@@ -13,6 +13,14 @@ from ..utils.parsers import parse_follower_count
 
 logger = logging.getLogger(__name__)
 
+# Try to import browser scraper (optional dependency)
+try:
+    from ..utils.browser_scraper import scrape_with_browser
+    BROWSER_AVAILABLE = True
+except ImportError:
+    BROWSER_AVAILABLE = False
+    logger.debug("Browser scraper not available. Install undetected-chromedriver for better results.")
+
 
 class XScraper(BasePlatformScraper):
     """Scraper for X (Twitter) accounts."""
@@ -198,26 +206,107 @@ class XScraper(BasePlatformScraper):
                     if match:
                         posts = parse_follower_count(match.group(1)) or 0
             
-            # If we still don't have data, X might be blocking us or the page structure changed
-            if followers == 0 and following == 0 and posts == 0:
-                logger.warning(f"Could not extract data from X page. Page structure may have changed or access is blocked.")
-                # Return minimal data to indicate we tried
+            # If we have some data, return it
+            if followers > 0 or following > 0 or posts > 0:
                 return {
-                    'followers_count': 0,
-                    'following_count': 0,
-                    'posts_count': 0,
-                    'likes_count': 0,
-                    'comments_count': 0,
-                    'shares_count': 0,
+                    'followers_count': followers,
+                    'following_count': following,
+                    'posts_count': posts,
+                    'likes_count': likes,  # Would need to fetch individual tweets
+                    'comments_count': 0,  # Would need to fetch individual tweets
+                    'shares_count': 0,  # Would need to fetch individual tweets
                 }
             
+            # If no data from static HTML, try browser automation (dynamic content)
+            if BROWSER_AVAILABLE:
+                logger.info(f"Static HTML returned no data for X account. Trying browser automation...")
+                try:
+                    html = scrape_with_browser(normalized_url, wait_time=8, driver_type='selenium')
+                    if html:
+                        soup = BeautifulSoup(html, 'html.parser')
+                        
+                        # Try to extract data from rendered page
+                        # Look for data in script tags (rendered JSON)
+                        scripts = soup.find_all('script', type='application/json')
+                        for script in scripts:
+                            try:
+                                import json
+                                data = json.loads(script.string)
+                                
+                                def find_counts(obj):
+                                    nonlocal followers, following, posts
+                                    if isinstance(obj, dict):
+                                        for key, value in obj.items():
+                                            key_lower = key.lower()
+                                            if 'follower' in key_lower and isinstance(value, (int, str)):
+                                                if isinstance(value, str):
+                                                    parsed = parse_follower_count(value)
+                                                    if parsed and followers == 0:
+                                                        followers = parsed
+                                                elif isinstance(value, int) and followers == 0:
+                                                    followers = value
+                                            if 'following' in key_lower and isinstance(value, (int, str)):
+                                                if isinstance(value, str):
+                                                    parsed = parse_follower_count(value)
+                                                    if parsed and following == 0:
+                                                        following = parsed
+                                                elif isinstance(value, int) and following == 0:
+                                                    following = value
+                                            if ('tweet' in key_lower or 'post' in key_lower) and 'count' in key_lower:
+                                                if isinstance(value, (int, str)):
+                                                    if isinstance(value, str):
+                                                        parsed = parse_follower_count(value)
+                                                        if parsed and posts == 0:
+                                                            posts = parsed
+                                                    elif isinstance(value, int) and posts == 0:
+                                                        posts = value
+                                            find_counts(value)
+                                    elif isinstance(obj, list):
+                                        for item in obj:
+                                            find_counts(item)
+                                
+                                find_counts(data)
+                            except (json.JSONDecodeError, Exception):
+                                pass
+                        
+                        # Also try text extraction from rendered page
+                        if followers == 0 or following == 0 or posts == 0:
+                            text = soup.get_text()
+                            if followers == 0:
+                                match = re.search(r'([\d.]+[KMBkmb]?)\s*followers?', text, re.IGNORECASE)
+                                if match:
+                                    followers = parse_follower_count(match.group(1)) or 0
+                            if following == 0:
+                                match = re.search(r'([\d.]+[KMBkmb]?)\s*following', text, re.IGNORECASE)
+                                if match:
+                                    following = parse_follower_count(match.group(1)) or 0
+                            if posts == 0:
+                                match = re.search(r'([\d.]+[KMBkmb]?)\s*(?:posts?|tweets?)', text, re.IGNORECASE)
+                                if match:
+                                    posts = parse_follower_count(match.group(1)) or 0
+                        
+                        if followers > 0 or following > 0 or posts > 0:
+                            logger.info(f"Successfully extracted data using browser automation for X account")
+                            return {
+                                'followers_count': followers,
+                                'following_count': following,
+                                'posts_count': posts,
+                                'likes_count': likes,
+                                'comments_count': 0,
+                                'shares_count': 0,
+                            }
+                except Exception as e:
+                    logger.warning(f"Browser automation failed for X account: {e}")
+            
+            # If still no data, return zeros
+            logger.warning(f"Could not extract data from X page. Page structure may have changed or access is blocked.")
             return {
-                'followers_count': followers,
-                'following_count': following,
-                'posts_count': posts,
-                'likes_count': likes,  # Would need to fetch individual tweets
-                'comments_count': 0,  # Would need to fetch individual tweets
-                'shares_count': 0,  # Would need to fetch individual tweets
+                'followers_count': 0,
+                'following_count': 0,
+                'posts_count': 0,
+                'likes_count': 0,
+                'comments_count': 0,
+                'shares_count': 0,
             }
             
         except AccountNotFoundError:

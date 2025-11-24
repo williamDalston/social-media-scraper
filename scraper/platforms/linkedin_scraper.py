@@ -13,6 +13,14 @@ from ..utils.parsers import parse_follower_count
 
 logger = logging.getLogger(__name__)
 
+# Try to import browser scraper (optional dependency)
+try:
+    from ..utils.browser_scraper import scrape_with_browser
+    BROWSER_AVAILABLE = True
+except ImportError:
+    BROWSER_AVAILABLE = False
+    logger.debug("Browser scraper not available. Install undetected-chromedriver for better results.")
+
 
 class LinkedInScraper(BasePlatformScraper):
     """Scraper for LinkedIn company/showcase pages."""
@@ -136,22 +144,82 @@ class LinkedInScraper(BasePlatformScraper):
                 if match:
                     followers = parse_follower_count(match.group(1)) or 0
             
-            # LinkedIn is very restrictive and may block scrapers
-            if followers == 0:
-                logger.warning(f"Could not extract data from LinkedIn page. LinkedIn may be blocking scrapers or page structure changed.")
+            # If we have data, return it
+            if followers > 0:
                 return {
-                    'followers_count': 0,
-                    'following_count': 0,
-                    'posts_count': 0,
+                    'followers_count': followers,
+                    'following_count': 0,  # LinkedIn pages don't have following
+                    'posts_count': 0,  # Hard to extract
                     'likes_count': 0,
                     'comments_count': 0,
                     'shares_count': 0,
                 }
             
+            # If no data from static HTML, try browser automation (dynamic content)
+            # LinkedIn is very restrictive, so browser automation is often necessary
+            if BROWSER_AVAILABLE:
+                logger.info(f"Static HTML returned no data for LinkedIn page. Trying browser automation...")
+                try:
+                    html = scrape_with_browser(normalized_url, wait_time=12, driver_type='selenium')
+                    if html:
+                        soup = BeautifulSoup(html, 'html.parser')
+                        
+                        # Try to extract data from rendered page
+                        meta_tags = soup.find_all('meta')
+                        for tag in meta_tags:
+                            name = tag.get('name', '') or tag.get('property', '')
+                            content = tag.get('content', '')
+                            
+                            if 'followers' in name.lower() and content:
+                                parsed = parse_follower_count(content)
+                                if parsed:
+                                    followers = parsed
+                        
+                        # Also try JSON-LD script tags
+                        scripts = soup.find_all('script', type='application/ld+json')
+                        for script in scripts:
+                            try:
+                                import json
+                                data = json.loads(script.string)
+                                if isinstance(data, dict) and 'interactionStatistic' in data:
+                                    for stat in data['interactionStatistic']:
+                                        if isinstance(stat, dict):
+                                            interaction_type = stat.get('interactionType', {}).get('@type', '')
+                                            value = stat.get('userInteractionCount', 0)
+                                            if 'followers' in interaction_type.lower() or 'FollowAction' in interaction_type:
+                                                if isinstance(value, str):
+                                                    followers = parse_follower_count(value) or 0
+                                                else:
+                                                    followers = int(value) if value else 0
+                            except (json.JSONDecodeError, Exception):
+                                pass
+                        
+                        # Also try text extraction
+                        if followers == 0:
+                            text = soup.get_text()
+                            match = re.search(r'([\d.]+[KMBkmb]?)\s*followers?', text, re.IGNORECASE)
+                            if match:
+                                followers = parse_follower_count(match.group(1)) or 0
+                        
+                        if followers > 0:
+                            logger.info(f"Successfully extracted data using browser automation for LinkedIn page")
+                            return {
+                                'followers_count': followers,
+                                'following_count': 0,
+                                'posts_count': 0,
+                                'likes_count': 0,
+                                'comments_count': 0,
+                                'shares_count': 0,
+                            }
+                except Exception as e:
+                    logger.warning(f"Browser automation failed for LinkedIn page: {e}")
+            
+            # If still no data, return zeros
+            logger.warning(f"Could not extract data from LinkedIn page. LinkedIn may be blocking scrapers or page structure changed.")
             return {
-                'followers_count': followers,
-                'following_count': 0,  # LinkedIn pages don't have following
-                'posts_count': 0,  # Hard to extract
+                'followers_count': 0,
+                'following_count': 0,
+                'posts_count': 0,
                 'likes_count': 0,
                 'comments_count': 0,
                 'shares_count': 0,

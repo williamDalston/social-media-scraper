@@ -65,6 +65,11 @@ social_media.db
 test_*.db
 *.db-journal
 
+# GitHub Pages exports (generated files, keep in repo)
+# public/data/*.csv
+# public/data/*.json
+# public/report.txt
+
 # Docker
 docker-compose.override.yml
 

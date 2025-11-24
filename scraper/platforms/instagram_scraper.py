@@ -13,6 +13,14 @@ from ..utils.parsers import parse_follower_count
 
 logger = logging.getLogger(__name__)
 
+# Try to import browser scraper (optional dependency)
+try:
+    from ..utils.browser_scraper import scrape_with_browser
+    BROWSER_AVAILABLE = True
+except ImportError:
+    BROWSER_AVAILABLE = False
+    logger.debug("Browser scraper not available. Install undetected-chromedriver for better results.")
+
 
 class InstagramScraper(BasePlatformScraper):
     """Scraper for Instagram accounts."""
@@ -202,24 +210,89 @@ class InstagramScraper(BasePlatformScraper):
                     if match:
                         posts = parse_follower_count(match.group(1)) or 0
             
-            # If we still don't have data, Instagram might be blocking us
-            if followers == 0 and following == 0 and posts == 0:
-                logger.warning(f"Could not extract data from Instagram page. Account may be private or page structure changed.")
+            # If we have some data, return it
+            if followers > 0 or following > 0 or posts > 0:
                 return {
-                    'followers_count': 0,
-                    'following_count': 0,
-                    'posts_count': 0,
-                    'likes_count': 0,
-                    'comments_count': 0,
+                    'followers_count': followers,
+                    'following_count': following,
+                    'posts_count': posts,
+                    'likes_count': 0,  # Would need to fetch individual posts
+                    'comments_count': 0,  # Would need to fetch individual posts
                     'shares_count': 0,
                 }
             
+            # If no data from static HTML, try browser automation (dynamic content)
+            if BROWSER_AVAILABLE:
+                logger.info(f"Static HTML returned no data for Instagram account. Trying browser automation...")
+                try:
+                    html = scrape_with_browser(normalized_url, wait_time=10, driver_type='selenium')
+                    if html:
+                        soup = BeautifulSoup(html, 'html.parser')
+                        
+                        # Look for window._sharedData in rendered page
+                        scripts = soup.find_all('script')
+                        for script in scripts:
+                            if script.string and 'window._sharedData' in script.string:
+                                try:
+                                    match = re.search(r'window\._sharedData\s*=\s*({.+?});', script.string, re.DOTALL)
+                                    if match:
+                                        import json
+                                        data = json.loads(match.group(1))
+                                        
+                                        if 'entry_data' in data and 'ProfilePage' in data['entry_data']:
+                                            profile = data['entry_data']['ProfilePage'][0]
+                                            if 'graphql' in profile and 'user' in profile['graphql']:
+                                                user = profile['graphql']['user']
+                                                followers = user.get('edge_followed_by', {}).get('count', 0)
+                                                following = user.get('edge_follow', {}).get('count', 0)
+                                                posts = user.get('edge_owner_to_timeline_media', {}).get('count', 0)
+                                                break
+                                except (json.JSONDecodeError, Exception) as e:
+                                    logger.debug(f"Error parsing _sharedData: {e}")
+                        
+                        # Also try meta tags from rendered page
+                        if followers == 0 or following == 0 or posts == 0:
+                            meta_tags = soup.find_all('meta')
+                            for tag in meta_tags:
+                                name = tag.get('name', '') or tag.get('property', '')
+                                content = tag.get('content', '')
+                                
+                                if 'followers' in name.lower() and content and followers == 0:
+                                    parsed = parse_follower_count(content)
+                                    if parsed:
+                                        followers = parsed
+                                
+                                if 'following' in name.lower() and content and following == 0:
+                                    parsed = parse_follower_count(content)
+                                    if parsed:
+                                        following = parsed
+                                
+                                if 'posts' in name.lower() and content and posts == 0:
+                                    parsed = parse_follower_count(content)
+                                    if parsed:
+                                        posts = parsed
+                        
+                        if followers > 0 or following > 0 or posts > 0:
+                            logger.info(f"Successfully extracted data using browser automation for Instagram account")
+                            return {
+                                'followers_count': followers,
+                                'following_count': following,
+                                'posts_count': posts,
+                                'likes_count': 0,
+                                'comments_count': 0,
+                                'shares_count': 0,
+                            }
+                except Exception as e:
+                    logger.warning(f"Browser automation failed for Instagram account: {e}")
+            
+            # If still no data, return zeros
+            logger.warning(f"Could not extract data from Instagram page. Account may be private or page structure changed.")
             return {
-                'followers_count': followers,
-                'following_count': following,
-                'posts_count': posts,
-                'likes_count': 0,  # Would need to fetch individual posts
-                'comments_count': 0,  # Would need to fetch individual posts
+                'followers_count': 0,
+                'following_count': 0,
+                'posts_count': 0,
+                'likes_count': 0,
+                'comments_count': 0,
                 'shares_count': 0,
             }
             

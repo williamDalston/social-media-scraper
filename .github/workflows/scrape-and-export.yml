@@ -1,0 +1,82 @@
+name: Scrape and Export Data
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape-and-export:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            wget \
+            gnupg \
+            unzip
+      
+      - name: Install Chrome for browser automation
+        run: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          google-chrome --version
+      
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Initialize database
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+        run: |
+          python -c "from scraper.schema import init_db; init_db('social_media.db')"
+          python -c "from scraper.extract_accounts import populate_accounts; populate_accounts()"
+      
+      - name: Run scraper
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          DATABASE_PATH: social_media.db
+        run: |
+          python -c "from scraper.collect_metrics import simulate_metrics; simulate_metrics(mode='real', parallel=True, max_workers=5)"
+      
+      - name: Create public directory
+        run: |
+          mkdir -p public/data
+      
+      - name: Export to CSV
+        run: |
+          python scripts/export_to_csv.py social_media.db public/data/hhs_social_media_data.csv
+      
+      - name: Export to JSON
+        run: |
+          python scripts/export_to_json.py social_media.db public/data/hhs_social_media_data.json
+      
+      - name: Generate report
+        run: |
+          python scripts/generate_report.py social_media.db > public/report.txt || echo "Report generation completed with warnings"
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add public/
+          git diff --staged --quiet || git commit -m "Update data export: $(date +'%Y-%m-%d %H:%M:%S UTC')"
+          git push
+

@@ -17,6 +17,7 @@ from .platforms import (
     TruthScraper,
     TikTokScraper,
     RedditScraper,
+    FlickrScraper,
 )
 
 # Set up logging
@@ -83,12 +84,15 @@ class RealScraper(BaseScraper):
         'twitter': XScraper,  # Alias for x
         'instagram': InstagramScraper,
         'facebook': FacebookScraper,
+        'facebook español': FacebookScraper,  # Spanish Facebook pages
         'linkedin': LinkedInScraper,
         'youtube': YouTubeScraper,
         'truth_social': TruthScraper,
         'truth': TruthScraper,  # Alias
+        'truth social': TruthScraper,  # With space
         'tiktok': TikTokScraper,
         'reddit': RedditScraper,
+        'flickr': FlickrScraper,
     }
     
     def __init__(self):
@@ -108,6 +112,18 @@ class RealScraper(BaseScraper):
         """
         # Normalize platform name
         platform = platform.lower().strip()
+        
+        # Normalize common variations
+        platform_normalizations = {
+            'facebook español': 'facebook',
+            'facebook espanol': 'facebook',
+            'truth social': 'truth_social',
+            'twitter': 'x',
+        }
+        
+        # Apply normalization
+        if platform in platform_normalizations:
+            platform = platform_normalizations[platform]
         
         # Check cache first
         if platform in self._scrapers:

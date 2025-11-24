@@ -25,28 +25,37 @@ def extract_handle(url, platform):
     parsed = urlparse(url)
     path = parsed.path.strip('/')
     
-    if platform == 'X':
+    # Normalize platform name for comparison
+    platform_lower = platform.lower()
+    
+    if platform_lower == 'x' or platform_lower == 'twitter':
         return path.split('/')[-1] # x.com/Handle
-    elif platform == 'Facebook':
+    elif platform_lower == 'facebook' or 'facebook' in platform_lower:
         if 'profile.php' in path:
             return path # Keep ID if it's a profile ID
         return path.split('/')[-1]
-    elif platform == 'Instagram':
+    elif platform_lower == 'instagram':
         return path.split('/')[0]
-    elif platform == 'LinkedIn':
+    elif platform_lower == 'linkedin':
         # linkedin.com/company/name or linkedin.com/showcase/name
         parts = path.split('/')
         if len(parts) > 1:
             return parts[1]
         return parts[0]
-    elif platform == 'YouTube':
+    elif platform_lower == 'youtube':
         # youtube.com/user/name or youtube.com/c/name or youtube.com/@handle
         parts = path.split('/')
         if len(parts) > 1 and parts[0] in ['user', 'c']:
             return parts[1]
         return path
-    elif platform == 'Truth Social':
+    elif platform_lower == 'truth social' or platform_lower == 'truth_social':
         return path.replace('@', '')
+    elif platform_lower == 'flickr':
+        # flickr.com/photos/username or flickr.com/people/username
+        parts = path.split('/')
+        if len(parts) > 1:
+            return parts[1]
+        return parts[0]
     
     return path
 

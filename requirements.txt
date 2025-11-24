@@ -72,7 +72,10 @@ opentelemetry-exporter-otlp-proto-grpc>=1.20.0
 # Scraper-specific packages
 google-api-python-client>=2.100.0  # For YouTube Data API v3
 selenium>=4.15.0  # Optional, for JS-heavy sites
+undetected-chromedriver>=3.5.0  # Recommended: Anti-detection ChromeDriver for social media scraping
 tweepy>=4.14.0  # Optional, for Twitter API (if using API instead of web scraping)
+instaloader>=4.10  # Optional, for Instagram (handles complexity well)
+fake-useragent>=1.4.0  # For rotating user-agent strings
 # OAuth2 packages
 authlib>=1.2.0
 requests-oauthlib>=1.3.0
