@@ -108,7 +108,7 @@ def perf_benchmark():
     return PerformanceBenchmark()
 
 
-def test_api_summary_performance(benchmark, client):
+def test_api_summary_performance(perf_benchmark, client):
     """Benchmark /api/summary endpoint."""
     result = perf_benchmark.benchmark_endpoint(client, 'GET', '/api/summary', iterations=20)
     
