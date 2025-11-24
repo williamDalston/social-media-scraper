@@ -174,60 +174,35 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
         from sqlalchemy import create_engine
         from sqlalchemy.pool import NullPool
         
-        # Construct SQLite URL
+        # Construct SQLite URL using SQLAlchemy's URL.create() for reliability
+        from sqlalchemy.engine.url import URL as SQLAlchemyURL
         if db_path_str.startswith('sqlite:///'):
             sqlite_url = db_path_str
         elif db_path_str.startswith('sqlite://'):
             sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
         else:
-            # Make absolute and normalize - be very careful here
+            # Convert to absolute path and use SQLAlchemy's URL.create() for correct format
             try:
-                # Get current working directory
-                cwd = os.getcwd()
-                sys.stderr.write(f"[INIT_DB ULTIMATE] CWD: '{cwd}'\n")
-                sys.stderr.flush()
-                
-                # Make absolute path
                 if os.path.isabs(db_path_str):
-                    abs_path = db_path_str
+                    abs_path = os.path.normpath(db_path_str).replace('\\', '/')
                 else:
-                    abs_path = os.path.abspath(db_path_str)
+                    abs_path = os.path.abspath(db_path_str).replace('\\', '/')
                 
-                sys.stderr.write(f"[INIT_DB ULTIMATE] Absolute path: '{abs_path}'\n")
+                # Use SQLAlchemy's URL.create() to ensure correct format
+                sqlite_url_obj = SQLAlchemyURL.create(
+                    drivername='sqlite',
+                    database=abs_path
+                )
+                sqlite_url = str(sqlite_url_obj)
+                
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Constructed URL using URL.create(): '{sqlite_url}'\n")
                 sys.stderr.flush()
-                
-                # Normalize path separators - MUST use forward slashes
-                # Remove any backslashes first
-                normalized = abs_path.replace('\\', '/')
-                # Remove double slashes (but preserve sqlite:///)
-                while '//' in normalized and not normalized.startswith('sqlite://'):
-                    normalized = normalized.replace('//', '/')
-                
-                sys.stderr.write(f"[INIT_DB ULTIMATE] Normalized path: '{normalized}'\n")
-                sys.stderr.flush()
-                
-                # Construct SQLite URL
-                # SQLite URLs: sqlite:///relative/path (3 slashes) or sqlite:////absolute/path (4 slashes)
-                # For absolute paths, we need 4 slashes: sqlite:////absolute/path
-                # SQLAlchemy expects: sqlite:///./relative or sqlite:////absolute
-                if normalized.startswith('/'):
-                    # Absolute path - use 4 slashes: sqlite:////absolute/path
-                    # This creates: sqlite:/// + /absolute/path = sqlite:////absolute/path
-                    sqlite_url = f'sqlite:///{normalized}'
-                    sys.stderr.write(f"[INIT_DB ULTIMATE] Constructed absolute path URL with 4 slashes: '{sqlite_url}'\n")
-                    sys.stderr.flush()
-                else:
-                    # Relative path - use 3 slashes: sqlite:///relative/path
-                    sqlite_url = f'sqlite:///{normalized}'
-                    sys.stderr.write(f"[INIT_DB ULTIMATE] Constructed relative path URL with 3 slashes: '{sqlite_url}'\n")
-                    sys.stderr.flush()
-                    
             except Exception as path_error:
-                sys.stderr.write(f"[INIT_DB ULTIMATE] Path normalization error: {path_error}\n")
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Path conversion error: {path_error}, using simple format\n")
                 sys.stderr.flush()
-                # Ultimate fallback - use the string as-is with sqlite:/// prefix
-                simple_path = db_path_str.replace('\\', '/').replace('//', '/')
-                sqlite_url = f'sqlite:///{simple_path}'
+                # Fallback: simple relative path format
+                normalized = db_path_str.replace('\\', '/').lstrip('/')
+                sqlite_url = f'sqlite:///{normalized}'
         
         sys.stderr.write(f"[INIT_DB ULTIMATE] SQLite URL before validation: '{sqlite_url}'\n")
         sys.stderr.flush()
@@ -263,9 +238,10 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
             raise ValueError(f"SQLite URL too short: '{sqlite_url}'")
         
         # CRITICAL: Validate URL with SQLAlchemy's URL parser BEFORE create_engine
+        from sqlalchemy.engine.url import make_url
         try:
-            from sqlalchemy.engine.url import make_url
             sys.stderr.write(f"[INIT_DB ULTIMATE] Validating URL with SQLAlchemy parser...\n")
+            sys.stderr.write(f"[INIT_DB ULTIMATE] URL to validate: '{sqlite_url}'\n")
             sys.stderr.flush()
             # Try to parse the URL - this will raise an error if invalid
             parsed_url = make_url(sqlite_url)
@@ -276,27 +252,47 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
             sys.stderr.write(f"[INIT_DB ULTIMATE] Invalid URL was: '{sqlite_url}'\n")
             sys.stderr.write(f"[INIT_DB ULTIMATE] Original db_path was: '{db_path_str}'\n")
             sys.stderr.flush()
-            # Try to fix it one more time
-            if not sqlite_url.startswith('sqlite:///'):
-                fixed_url = f'sqlite:///{db_path_str}'
-                sys.stderr.write(f"[INIT_DB ULTIMATE] Trying fixed URL: '{fixed_url}'\n")
+            
+            # Try alternative construction using URL.create() for absolute paths
+            try:
+                from sqlalchemy.engine.url import URL as SQLAlchemyURL
+                if os.path.isabs(db_path_str):
+                    abs_path = db_path_str
+                else:
+                    abs_path = os.path.abspath(db_path_str)
+                abs_path = abs_path.replace('\\', '/')
+                
+                # Use URL.create() which handles the format correctly
+                sqlite_url_obj = SQLAlchemyURL.create(
+                    drivername='sqlite',
+                    database=abs_path
+                )
+                sqlite_url = str(sqlite_url_obj)
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Reconstructed URL using URL.create(): '{sqlite_url}'\n")
+                sys.stderr.flush()
+                
+                # Validate the new URL
+                make_url(sqlite_url)
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Reconstructed URL is valid!\n")
+                sys.stderr.flush()
+            except Exception as create_error:
+                sys.stderr.write(f"[INIT_DB ULTIMATE] URL.create() also failed: {create_error}\n")
+                sys.stderr.flush()
+                # Last resort: simple relative format
+                simple_path = db_path_str.replace('\\', '/').lstrip('/')
+                sqlite_url = f'sqlite:///{simple_path}'
+                sys.stderr.write(f"[INIT_DB ULTIMATE] Using last resort simple format: '{sqlite_url}'\n")
                 sys.stderr.flush()
                 try:
-                    make_url(fixed_url)
-                    sqlite_url = fixed_url
-                    sys.stderr.write(f"[INIT_DB ULTIMATE] Fixed URL is valid!\n")
+                    make_url(sqlite_url)
+                    sys.stderr.write(f"[INIT_DB ULTIMATE] Last resort URL is valid!\n")
                     sys.stderr.flush()
-                except Exception:
+                except Exception as final_error:
                     raise ValueError(
-                        f"SQLite URL validation failed. Original: '{db_path_str}', "
-                        f"Constructed: '{sqlite_url}', Fixed: '{fixed_url}'. "
-                        f"Error: {url_error}"
-                    ) from url_error
-            else:
-                raise ValueError(
-                    f"SQLite URL validation failed for: '{sqlite_url}' (from '{db_path_str}'). "
-                    f"Error: {url_error}"
-                ) from url_error
+                        f"SQLite URL validation failed after all attempts. "
+                        f"Original: '{db_path_str}', Final attempt: '{sqlite_url}'. "
+                        f"Errors: {url_error}, {create_error}, {final_error}"
+                    ) from final_error
         
         # Create engine
         try:
