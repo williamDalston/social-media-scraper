@@ -103,8 +103,8 @@ jobs:
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           DATABASE_URL: sqlite:///social_media.db
         run: |
-          echo "=== DEBUG: About to initialize database ==="
-          python -c "from scraper.schema import init_db; print('Calling init_db with explicit URL...'); init_db('sqlite:///social_media.db'); print('SUCCESS: Database initialized!')"
+          echo "=== WORKFLOW VERSION: Using explicit sqlite:/// URL format - 2025-01-24 ==="
+          python -c "from scraper.schema import init_db; init_db('sqlite:///social_media.db')"
       
       - name: Populate accounts
         env:
