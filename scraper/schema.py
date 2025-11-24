@@ -154,7 +154,8 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     # CRITICAL SAFETY CHECK: If it ends in .db, it's ALWAYS SQLite, no exceptions
     # This prevents any logic errors from causing SQLite files to be treated as production DBs
     # Check happens FIRST, before any other logic
-    if db_path.endswith('.db'):
+    # This MUST catch 'social_media.db' and all other .db files
+    if '.db' in db_path and db_path.endswith('.db'):
         # Force SQLite handling - construct URL and return early
         # Handle both 'sqlite:///' and plain filenames
         if db_path.startswith('sqlite:///'):
