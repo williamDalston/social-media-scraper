@@ -139,10 +139,33 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     
     logger = logging.getLogger(__name__)
     
+    # PREEMPTIVE VALIDATION: Use the normalization utility to catch errors early
+    try:
+        from scraper.utils.db_path_normalizer import normalize_db_path, validate_sqlite_url
+        normalized_path, sqlite_url, is_sqlite = normalize_db_path(db_path)
+        
+        # Log the normalization result
+        print(f"[INIT_DB] Normalized path: '{db_path}' -> is_sqlite={is_sqlite}, sqlite_url='{sqlite_url}'", file=sys.stderr, flush=True)
+        logger.info(f"[INIT_DB] Normalized: db_path='{db_path}' -> is_sqlite={is_sqlite}")
+        
+    except ImportError:
+        # Fallback if normalization utility not available
+        print(f"[INIT_DB WARNING] db_path_normalizer not available, using fallback logic", file=sys.stderr, flush=True)
+        normalized_path = db_path
+        sqlite_url = None
+        is_sqlite = None  # Will be determined below
+    except Exception as norm_error:
+        # If normalization fails, log and continue with original path
+        print(f"[INIT_DB WARNING] Normalization failed: {norm_error}, using original path", file=sys.stderr, flush=True)
+        logger.warning(f"Path normalization failed: {norm_error}")
+        normalized_path = db_path
+        sqlite_url = None
+        is_sqlite = None
+    
     # Import Job model to register it with Base
     from models.job import Job  # noqa: F401
     
-    # Validate db_path
+    # Validate db_path (basic validation)
     if not db_path:
         raise ValueError("Database path cannot be empty or None")
     if not isinstance(db_path, str):
@@ -152,15 +175,54 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     if not db_path:
         raise ValueError("Database path cannot be empty after stripping whitespace")
     
+    # CRITICAL SAFETY CHECK: If normalization says it's SQLite, handle it immediately
+    if is_sqlite is True and sqlite_url:
+        # We already have a validated SQLite URL from normalization
+        print(f"[INIT_DB] Using pre-normalized SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+        if not validate_sqlite_url(sqlite_url):
+            raise ValueError(f"Normalized SQLite URL is invalid: '{sqlite_url}'")
+        
+        try:
+            engine = create_engine(
+                sqlite_url,
+                poolclass=NullPool,
+                connect_args={
+                    'check_same_thread': False,
+                    'timeout': 20
+                },
+                echo=False
+            )
+            print(f"[INIT_DB] SQLite engine created successfully with URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+            
+            # Continue with initialization
+            if enable_profiling:
+                try:
+                    from config.database_performance import setup_query_monitoring
+                    setup_query_monitoring(engine)
+                except Exception as e:
+                    logger.warning(f"Could not set up database monitoring: {e}")
+                try:
+                    from scraper.utils.query_profiler import setup_query_listening
+                    setup_query_listening(engine)
+                except Exception as e:
+                    logger.warning(f"Could not set up query profiling: {e}")
+            
+            Base.metadata.create_all(engine)
+            _ensure_indexes(engine, normalized_path)
+            return engine
+        except Exception as e:
+            raise ValueError(f"Failed to create SQLite engine with pre-normalized URL '{sqlite_url}': {e}") from e
+    
+    # Fallback detection if normalization didn't work or wasn't available
+    # This should rarely be needed, but provides a safety net
     # CRITICAL SAFETY CHECK: If it ends in .db, it's ALWAYS SQLite, no exceptions
-    # This prevents any logic errors from causing SQLite files to be treated as production DBs
-    # Check happens FIRST, before any other logic
-    # This MUST catch 'social_media.db' and all other .db files
-    # Use multiple checks to be absolutely sure
-    is_db_file = ('.db' in db_path) and (db_path.endswith('.db') or db_path.endswith('.DB'))
+    db_path_lower = db_path.lower()
+    is_db_file = ('.db' in db_path_lower) and (db_path_lower.endswith('.db'))
     
     # Force check - if it contains .db anywhere, treat as SQLite
+    # This is a final safety net in case normalization failed
     if is_db_file or 'social_media.db' in db_path or db_path == 'social_media.db':
+        print(f"[INIT_DB FALLBACK] Using fallback .db detection for: '{db_path}'", file=sys.stderr, flush=True)
         # Force SQLite handling - construct URL and return early
         try:
             # Log explicitly to help debug CI/CD issues - do this FIRST
