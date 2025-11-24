@@ -166,28 +166,15 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
             import logging
             logger = logging.getLogger(__name__)
             logger.warning(f"Could not set up database monitoring: {e}")
-    else:
-        # Production database (PostgreSQL/MySQL) - use optimized connection pooling
-        pool_size = int(os.getenv('DB_POOL_SIZE', '5'))
-        max_overflow = int(os.getenv('DB_MAX_OVERFLOW', '10'))
-        pool_timeout = int(os.getenv('DB_POOL_TIMEOUT', '30'))
-        pool_recycle = int(os.getenv('DB_POOL_RECYCLE', '3600'))
         
-        engine = create_engine(
-            db_path,
-            poolclass=QueuePool,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-            pool_timeout=pool_timeout,
-            pool_recycle=pool_recycle,  # Recycle connections after 1 hour
-            pool_pre_ping=True,  # Verify connections before using
-            echo=False
-        )
-    
-    # Set up query profiling if enabled
-    if enable_profiling:
-        from scraper.utils.query_profiler import setup_query_listening
-        setup_query_listening(engine)
+        # Set up query profiling if enabled
+        try:
+            from scraper.utils.query_profiler import setup_query_listening
+            setup_query_listening(engine)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not set up query profiling: {e}")
     
     # Create all tables
     Base.metadata.create_all(engine)
