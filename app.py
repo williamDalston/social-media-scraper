@@ -611,9 +611,11 @@ def run_scraper():
     except ImportError:
         # Preflight checks module not available - continue anyway
         logger.warning("Pre-flight checks module not available, skipping validation")
+        preflight_results = None
     except Exception as e:
         # Don't fail on preflight check errors - log and continue
         logger.warning(f"Pre-flight checks encountered an error (continuing anyway): {str(e)}")
+        preflight_results = None
     
     try:
         from scraper.collect_metrics import simulate_metrics
