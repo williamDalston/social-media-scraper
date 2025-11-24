@@ -1,3 +1,5 @@
+import sys; print("[schema.py] NEW VERSION LOADED - 2025-01-24", file=sys.stderr); sys.stderr.flush()
+
 from sqlalchemy import create_engine, Column, Integer, String, Boolean, Date, DateTime, ForeignKey, Float, Text
 from sqlalchemy.orm import declarative_base, relationship
 from datetime import datetime
