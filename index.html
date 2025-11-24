@@ -716,11 +716,8 @@
             
             const platforms = accounts.length > 0 ? [...new Set(accounts.map(a => a.platform))] : ['X', 'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'Flickr', 'Truth Social'];
             const organizations = accounts.length > 0 ? [...new Set(accounts.map(a => a.organization))] : [];
-                .then(accounts => {
-                    const platforms = [...new Set(accounts.map(a => a.platform))];
-                    const organizations = [...new Set(accounts.map(a => a.organization))];
 
-                    // Populate platform checkboxes
+            // Populate platform checkboxes
             const platformContainer = document.getElementById('platformCheckboxes');
             platforms.sort().forEach(platform => {
                 const div = document.createElement('div');
