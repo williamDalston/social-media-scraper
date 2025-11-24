@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history to ensure we get latest commits
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,6 +41,18 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+      
+      - name: Verify schema.py contains the fix
+        run: |
+          echo "=== First 5 lines of scraper/schema.py ==="
+          head -5 scraper/schema.py
+          echo ""
+          echo "=== Looking for _construct_sqlite_url function ==="
+          grep -n "_construct_sqlite_url" scraper/schema.py || (echo "ERROR: NOT FOUND – OLD VERSION STILL IN USE!" && exit 1)
+          echo ""
+          echo "=== Looking for debug marker ==="
+          grep -n "USING NEW FIXED VERSION" scraper/schema.py || (echo "ERROR: Debug marker not found!" && exit 1)
+          echo "✓ schema.py verification passed - new version confirmed"
       
       - name: Initialize database
         env:

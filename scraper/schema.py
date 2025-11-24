@@ -269,13 +269,15 @@ def init_db(db_path=None, enable_profiling: bool = False):
                 engine = create_engine(
                     url,
                     poolclass=QueuePool,
+                    future=True,
                     **pool_config
                 )
             except ImportError:
                 # PerformanceTuner not available - use default config
                 engine = create_engine(
                     url,
-                    poolclass=QueuePool
+                    poolclass=QueuePool,
+                    future=True
                 )
         else:
             raise ValueError(
