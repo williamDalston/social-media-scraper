@@ -101,7 +101,8 @@ jobs:
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
-        run: python -c "from sqlalchemy import create_engine; from scraper.schema import Base; engine = create_engine('sqlite:///social_media.db'); Base.metadata.create_all(engine); print('Database initialized successfully')"
+          DATABASE_URL: sqlite:///social_media.db
+        run: python -c "from scraper.schema import init_db; init_db('sqlite:///social_media.db')"
       
       - name: Populate accounts
         env:
