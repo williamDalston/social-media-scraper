@@ -4,279 +4,1104 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HHS Social Media Analytics Dashboard</title>
-    <script>
-        // Redirect to the functional dashboard if it exists, otherwise show landing page
-        if (window.location.pathname === '/' || window.location.pathname === '/index.html') {
-            window.location.href = './public/index.html';
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
+        /* HHS Color Palette - Based on HHS.gov Style Guide */
+        :root {
+            --hhs-primary: #0071BC;
+            --hhs-primary-dark: #205493;
+            --hhs-primary-darker: #112E51;
+            --hhs-secondary: #02BFE7;
+            --hhs-success: #2E8540;
+            --hhs-warning: #FDB81E;
+            --hhs-danger: #E31C3D;
+            --hhs-gray-light: #F1F1F1;
+            --hhs-gray-medium: #D6D7D9;
+            --hhs-gray-dark: #5B616B;
+            --hhs-text-primary: #212121;
+            --hhs-text-secondary: #5B616B;
+            --hhs-white: #FFFFFF;
+            --hhs-black: #000000;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            color: white;
-        }
-        
-        .container {
-            max-width: 800px;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 48px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-        }
-        
-        h1 {
-            font-size: 48px;
-            font-weight: 700;
-            margin-bottom: 16px;
-            background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.8) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .subtitle {
-            font-size: 20px;
-            margin-bottom: 32px;
-            opacity: 0.9;
-            font-weight: 300;
-        }
-        
-        .description {
-            font-size: 16px;
-            line-height: 1.8;
-            margin-bottom: 40px;
-            opacity: 0.85;
-        }
-        
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        .feature {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 24px;
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            transition: transform 0.3s, box-shadow 0.3s;
-        }
-        
-        .feature:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-        
-        .feature-icon {
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-        
-        .feature-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-        
-        .feature-desc {
-            font-size: 14px;
-            opacity: 0.8;
-        }
-        
-        .buttons {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
-        .btn {
-            padding: 14px 32px;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 16px;
-            text-decoration: none;
-            transition: all 0.3s;
-            border: 2px solid transparent;
-            display: inline-block;
-        }
-        
-        .btn-primary {
-            background: white;
-            color: #667eea;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-        
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        .btn-secondary {
-            background: transparent;
-            color: white;
-            border: 2px solid white;
-        }
-        
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: translateY(-2px);
-        }
-        
-        .info-box {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 24px;
-            margin-top: 32px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        
-        .info-box h3 {
-            font-size: 20px;
-            margin-bottom: 12px;
-        }
-        
-        .info-box p {
-            font-size: 14px;
-            opacity: 0.9;
+            font-family: 'Source Sans Pro', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background: var(--hhs-gray-light);
+            color: var(--hhs-text-primary);
             line-height: 1.6;
         }
-        
-        .badge {
-            display: inline-block;
-            background: rgba(255, 255, 255, 0.2);
-            padding: 4px 12px;
-            border-radius: 20px;
+
+        .header {
+            background: var(--hhs-primary-darker);
+            color: var(--hhs-white);
+            padding: 20px 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            color: var(--hhs-gray-medium);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 40px;
+        }
+
+        .action-bar {
+            background: var(--hhs-white);
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .customization-panel {
+            background: var(--hhs-white);
+            padding: 25px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .customization-panel.active {
+            display: block;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--hhs-gray-medium);
+        }
+
+        .panel-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--hhs-text-primary);
+        }
+
+        .panel-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 20px;
+        }
+
+        .panel-section {
+            background: var(--hhs-gray-light);
+            padding: 20px;
+            border-radius: 4px;
+        }
+
+        .panel-section h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: var(--hhs-primary-dark);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .checkbox-group {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label {
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--hhs-text-primary);
+            flex: 1;
+        }
+
+        .select-all-btn {
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .select-all-btn:hover {
+            background: var(--hhs-primary-dark);
+        }
+
+        .metric-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .metric-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: var(--hhs-white);
+            border-radius: 4px;
+        }
+
+        .date-range-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .date-input {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .date-input label {
             font-size: 12px;
             font-weight: 600;
-            margin: 4px;
+            color: var(--hhs-text-secondary);
+            text-transform: uppercase;
         }
-        
-        .dashboard-link {
-            display: block;
-            margin-top: 24px;
-            padding: 16px 32px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            color: white;
-            text-decoration: none;
+
+        .date-input input {
+            padding: 10px;
+            border: 1px solid var(--hhs-gray-medium);
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
             font-weight: 600;
-            transition: all 0.3s;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
         }
-        
-        .dashboard-link:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
+
+        .btn-primary {
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
         }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 32px 24px;
-            }
-            
-            h1 {
-                font-size: 36px;
-            }
-            
-            .subtitle {
-                font-size: 18px;
-            }
-            
-            .features {
-                grid-template-columns: 1fr;
-            }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--hhs-primary-dark);
+        }
+
+        .btn-success {
+            background: var(--hhs-success);
+            color: var(--hhs-white);
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #2a7340;
+        }
+
+        .btn-secondary {
+            background: var(--hhs-gray-dark);
+            color: var(--hhs-white);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #4a5568;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 2px solid var(--hhs-primary);
+            color: var(--hhs-primary);
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .panel-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--hhs-gray-medium);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--hhs-white);
+            padding: 25px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid var(--hhs-primary);
+        }
+
+        .stat-card h3 {
+            font-size: 14px;
+            color: var(--hhs-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--hhs-primary);
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--hhs-text-secondary);
+        }
+
+        .chart-container {
+            background: var(--hhs-white);
+            padding: 25px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .chart-container h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--hhs-text-primary);
+            border-bottom: 2px solid var(--hhs-gray-medium);
+            padding-bottom: 10px;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+
+        .data-table-container {
+            background: var(--hhs-white);
+            padding: 25px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+
+        .data-table-container h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--hhs-text-primary);
+            border-bottom: 2px solid var(--hhs-gray-medium);
+            padding-bottom: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: var(--hhs-gray-light);
+            color: var(--hhs-text-primary);
+            font-weight: 700;
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--hhs-gray-medium);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--hhs-gray-medium);
+        }
+
+        tr:hover {
+            background: var(--hhs-gray-light);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--hhs-text-secondary);
+        }
+
+        .loading::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #E7F3FF;
+            border-color: var(--hhs-primary);
+            color: var(--hhs-primary-dark);
+        }
+
+        .alert-success {
+            background: #D4EDDA;
+            border-color: var(--hhs-success);
+            color: #155724;
+        }
+
+        .alert-warning {
+            background: #FFF3CD;
+            border-color: var(--hhs-warning);
+            color: #856404;
+        }
+
+        .workflow-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spinner {
+            border: 3px solid var(--hhs-gray-medium);
+            border-top: 3px solid var(--hhs-primary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .filter-badge {
+            display: inline-block;
+            background: var(--hhs-primary);
+            color: var(--hhs-white);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+        }
+
+        .active-filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
+    <div class="header">
+        <h1>HHS Social Media Analytics Dashboard</h1>
+        <div class="subtitle">U.S. Department of Health & Human Services</div>
+    </div>
+
     <div class="container">
-        <h1>🚀 HHS Social Media Scraper</h1>
-        <p class="subtitle">Production-Ready Social Media Analytics Platform</p>
-        <p class="description">
-            A comprehensive social media scraping and analytics platform for tracking HHS (Health and Human Services) 
-            social media accounts across multiple platforms including X (Twitter), Instagram, Facebook, LinkedIn, 
-            YouTube, Truth Social, TikTok, and Reddit.
-        </p>
-        
-        <div class="features">
-            <div class="feature">
-                <div class="feature-icon">🕷️</div>
-                <div class="feature-title">Multi-Platform</div>
-                <div class="feature-desc">Scrape from 8+ social media platforms</div>
+        <div class="action-bar">
+            <div>
+                <button class="btn btn-primary" onclick="toggleCustomization()" id="customizeBtn">
+                    ⚙️ Customize Scraper
+                </button>
+                <button class="btn btn-primary" onclick="triggerWorkflow()" id="triggerBtn">
+                    🚀 Run Scraper
+                </button>
+                <button class="btn btn-secondary" onclick="refreshData()">
+                    🔄 Refresh Data
+                </button>
             </div>
-            <div class="feature">
-                <div class="feature-icon">⚡</div>
-                <div class="feature-title">High Performance</div>
-                <div class="feature-desc">Parallel scraping with real-time progress</div>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">📊</div>
-                <div class="feature-title">Analytics</div>
-                <div class="feature-desc">Comprehensive metrics and insights</div>
-            </div>
-            <div class="feature">
-                <div class="feature-icon">🔒</div>
-                <div class="feature-title">Secure</div>
-                <div class="feature-desc">JWT auth, OAuth2, MFA support</div>
+            <div>
+                <button class="btn btn-success" onclick="exportCustomizedData()" id="exportCustomBtn">
+                    📊 Export Custom Data
+                </button>
+                <a href="./public/data/hhs_social_media_data.csv" class="btn btn-success" download id="downloadCsv">
+                    📥 Download All CSV
+                </a>
+                <a href="./public/data/hhs_social_media_data.json" class="btn btn-success" download id="downloadJson">
+                    📥 Download All JSON
+                </a>
             </div>
         </div>
-        
-        <div class="buttons">
-            <a href="https://github.com/williamDalston/social-media-scraper" class="btn btn-primary" target="_blank">
-                📦 View on GitHub
-            </a>
-            <a href="https://github.com/williamDalston/social-media-scraper/blob/main/README.md" class="btn btn-secondary" target="_blank">
-                📖 Documentation
-            </a>
-            <a href="./public/index.html" class="btn btn-primary">
-                📊 View Dashboard
-            </a>
-        </div>
-        
-        <div class="info-box">
-            <h3>🚀 Getting Started</h3>
-            <p>
-                This is a Flask-based application. To run it locally, clone the repository and follow the setup instructions 
-                in the README. The application includes a modern dashboard with real-time progress tracking, comprehensive 
-                analytics, and production-ready features.
-            </p>
-            <div style="margin-top: 16px;">
-                <span class="badge">Flask</span>
-                <span class="badge">Python</span>
-                <span class="badge">Celery</span>
-                <span class="badge">Redis</span>
-                <span class="badge">SQLAlchemy</span>
-                <span class="badge">Docker</span>
-                <span class="badge">Kubernetes</span>
+
+        <div class="customization-panel" id="customizationPanel">
+            <div class="panel-header">
+                <h2>Scraper Customization Options</h2>
+                <button class="btn btn-outline" onclick="toggleCustomization()">✕ Close</button>
             </div>
-            <a href="./public/index.html" class="dashboard-link">
-                → Access Interactive Dashboard (Static Version)
-            </a>
+            
+            <div class="panel-sections">
+                <div class="panel-section">
+                    <h3>Platforms</h3>
+                    <button class="select-all-btn" onclick="selectAllPlatforms()">Select All</button>
+                    <div class="checkbox-group" id="platformCheckboxes">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Organizations</h3>
+                    <button class="select-all-btn" onclick="selectAllOrganizations()">Select All</button>
+                    <div class="checkbox-group" id="organizationCheckboxes">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Metrics to Collect</h3>
+                    <div class="metric-group">
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-followers" checked>
+                            <label for="metric-followers">Followers</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-following" checked>
+                            <label for="metric-following">Following</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-posts" checked>
+                            <label for="metric-posts">Posts</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-likes" checked>
+                            <label for="metric-likes">Likes</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-comments" checked>
+                            <label for="metric-comments">Comments</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-shares" checked>
+                            <label for="metric-shares">Shares</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-engagement" checked>
+                            <label for="metric-engagement">Engagement Total</label>
+                        </div>
+                        <div class="metric-checkbox">
+                            <input type="checkbox" id="metric-subscribers" checked>
+                            <label for="metric-subscribers">Subscribers (YouTube)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Date Range</h3>
+                    <div class="date-range-group">
+                        <div class="date-input">
+                            <label>Start Date</label>
+                            <input type="date" id="startDate">
+                        </div>
+                        <div class="date-input">
+                            <label>End Date</label>
+                            <input type="date" id="endDate">
+                        </div>
+                    </div>
+                    <button class="select-all-btn" onclick="resetDateRange()" style="margin-top: 10px;">Reset Date Range</button>
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <button class="btn btn-secondary" onclick="resetCustomization()">Reset All</button>
+                <button class="btn btn-primary" onclick="applyFilters()">Apply Filters</button>
+                <button class="btn btn-success" onclick="exportCustomizedData()">Export Custom Data</button>
+            </div>
+
+            <div class="active-filters" id="activeFilters"></div>
         </div>
-        
-        <div style="margin-top: 32px; opacity: 0.7; font-size: 14px;">
-            <p>For the live dashboard with full functionality, please run the Flask application locally or deploy it to your server.</p>
-            <p style="margin-top: 8px;">
-                <code style="background: rgba(0, 0, 0, 0.2); padding: 4px 8px; border-radius: 4px;">python app.py</code>
-            </p>
+
+        <div id="workflowStatus"></div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <h3>Total Accounts</h3>
+                <div class="stat-value" id="totalAccounts">-</div>
+                <div class="stat-label">Tracked accounts</div>
+            </div>
+            <div class="stat-card">
+                <h3>Platforms</h3>
+                <div class="stat-value" id="platformCount">-</div>
+                <div class="stat-label">Social media platforms</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Followers</h3>
+                <div class="stat-value" id="totalFollowers">-</div>
+                <div class="stat-label">Combined followers</div>
+            </div>
+            <div class="stat-card">
+                <h3>Latest Update</h3>
+                <div class="stat-value" id="lastUpdate" style="font-size: 16px;">-</div>
+                <div class="stat-label">Data collection date</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>Followers by Platform</h2>
+            <div class="chart-wrapper">
+                <canvas id="platformChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h2>Top Organizations by Followers</h2>
+            <div class="chart-wrapper">
+                <canvas id="organizationChart"></canvas>
+            </div>
+        </div>
+
+        <div class="data-table-container">
+            <h2>Recent Data Summary</h2>
+            <div id="dataTable">
+                <div class="loading">Loading data</div>
+            </div>
         </div>
     </div>
+
+    <script>
+        let platformChart = null;
+        let organizationChart = null;
+        let dataCache = null;
+        let filteredData = null;
+        let activeFilters = {
+            platforms: [],
+            organizations: [],
+            metrics: ['followers_count', 'following_count', 'posts_count', 'likes_count', 'comments_count', 'shares_count', 'engagements_total', 'subscribers_count'],
+            startDate: null,
+            endDate: null
+        };
+
+        // Load data on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            initializeCustomization();
+            // Auto-refresh every 5 minutes
+            setInterval(loadData, 300000);
+        });
+
+        async function loadData() {
+            try {
+                const response = await fetch('./public/data/hhs_social_media_data.json');
+                if (!response.ok) {
+                    throw new Error('Data file not found');
+                }
+                const data = await response.json();
+                dataCache = data;
+                applyFilters();
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('dataTable').innerHTML = `
+                    <div class="alert alert-warning">
+                        <strong>Data not available yet.</strong> Click "Run Scraper" to generate data, 
+                        or wait for the automatic daily update (runs at 2 AM UTC).
+                    </div>
+                `;
+            }
+        }
+
+        function initializeCustomization() {
+            // Load available platforms and organizations from accounts JSON
+            fetch('./public/hhs_accounts.json')
+                .then(response => response.json())
+                .then(accounts => {
+                    const platforms = [...new Set(accounts.map(a => a.platform))];
+                    const organizations = [...new Set(accounts.map(a => a.organization))];
+
+                    // Populate platform checkboxes
+                    const platformContainer = document.getElementById('platformCheckboxes');
+                    platforms.sort().forEach(platform => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
+                                   onchange="updateFilters()">
+                            <label for="platform-${platform}">${platform}</label>
+                        `;
+                        platformContainer.appendChild(div);
+                    });
+
+                    // Populate organization checkboxes
+                    const orgContainer = document.getElementById('organizationCheckboxes');
+                    organizations.sort().forEach(org => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="org-${org.replace(/\s+/g, '-')}" value="${org}" checked 
+                                   onchange="updateFilters()">
+                            <label for="org-${org.replace(/\s+/g, '-')}">${org}</label>
+                        `;
+                        orgContainer.appendChild(div);
+                    });
+
+                    // Initialize active filters
+                    activeFilters.platforms = platforms;
+                    activeFilters.organizations = organizations;
+                })
+                .catch(() => {
+                    // If accounts file not available, use defaults
+                    const defaultPlatforms = ['X', 'Facebook', 'Instagram', 'LinkedIn', 'YouTube', 'Flickr', 'Truth Social'];
+                    const platformContainer = document.getElementById('platformCheckboxes');
+                    defaultPlatforms.forEach(platform => {
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="platform-${platform}" value="${platform}" checked 
+                                   onchange="updateFilters()">
+                            <label for="platform-${platform}">${platform}</label>
+                        `;
+                        platformContainer.appendChild(div);
+                    });
+                });
+        }
+
+        function toggleCustomization() {
+            const panel = document.getElementById('customizationPanel');
+            panel.classList.toggle('active');
+        }
+
+        function selectAllPlatforms() {
+            const checkboxes = document.querySelectorAll('#platformCheckboxes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateFilters();
+        }
+
+        function selectAllOrganizations() {
+            const checkboxes = document.querySelectorAll('#organizationCheckboxes input[type="checkbox"]');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+            updateFilters();
+        }
+
+        function updateFilters() {
+            // Get selected platforms
+            activeFilters.platforms = Array.from(document.querySelectorAll('#platformCheckboxes input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            // Get selected organizations
+            activeFilters.organizations = Array.from(document.querySelectorAll('#organizationCheckboxes input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+
+            // Get selected metrics
+            activeFilters.metrics = [];
+            if (document.getElementById('metric-followers').checked) activeFilters.metrics.push('followers_count');
+            if (document.getElementById('metric-following').checked) activeFilters.metrics.push('following_count');
+            if (document.getElementById('metric-posts').checked) activeFilters.metrics.push('posts_count');
+            if (document.getElementById('metric-likes').checked) activeFilters.metrics.push('likes_count');
+            if (document.getElementById('metric-comments').checked) activeFilters.metrics.push('comments_count');
+            if (document.getElementById('metric-shares').checked) activeFilters.metrics.push('shares_count');
+            if (document.getElementById('metric-engagement').checked) activeFilters.metrics.push('engagements_total');
+            if (document.getElementById('metric-subscribers').checked) activeFilters.metrics.push('subscribers_count');
+
+            // Get date range
+            activeFilters.startDate = document.getElementById('startDate').value || null;
+            activeFilters.endDate = document.getElementById('endDate').value || null;
+
+            updateActiveFiltersDisplay();
+        }
+
+        function updateActiveFiltersDisplay() {
+            const container = document.getElementById('activeFilters');
+            const badges = [];
+
+            if (activeFilters.platforms.length > 0) {
+                badges.push(`<span class="filter-badge">Platforms: ${activeFilters.platforms.length}</span>`);
+            }
+            if (activeFilters.organizations.length > 0) {
+                badges.push(`<span class="filter-badge">Organizations: ${activeFilters.organizations.length}</span>`);
+            }
+            if (activeFilters.metrics.length > 0) {
+                badges.push(`<span class="filter-badge">Metrics: ${activeFilters.metrics.length}</span>`);
+            }
+            if (activeFilters.startDate || activeFilters.endDate) {
+                badges.push(`<span class="filter-badge">Date Range: ${activeFilters.startDate || 'Any'} to ${activeFilters.endDate || 'Any'}</span>`);
+            }
+
+            container.innerHTML = badges.length > 0 
+                ? '<strong>Active Filters:</strong> ' + badges.join(' ') 
+                : '<strong>No filters active</strong>';
+        }
+
+        function applyFilters() {
+            if (!dataCache || !dataCache.data) return;
+
+            filteredData = dataCache.data.filter(item => {
+                // Platform filter
+                if (activeFilters.platforms.length > 0 && !activeFilters.platforms.includes(item.platform)) {
+                    return false;
+                }
+
+                // Organization filter
+                if (activeFilters.organizations.length > 0 && !activeFilters.organizations.includes(item.organization)) {
+                    return false;
+                }
+
+                // Date range filter
+                if (activeFilters.startDate && item.snapshot_date && item.snapshot_date < activeFilters.startDate) {
+                    return false;
+                }
+                if (activeFilters.endDate && item.snapshot_date && item.snapshot_date > activeFilters.endDate) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            // Get latest snapshot date from filtered data
+            const latestDate = filteredData.length > 0 
+                ? Math.max(...filteredData.map(d => new Date(d.snapshot_date || 0).getTime()))
+                : null;
+            const latestData = latestDate 
+                ? filteredData.filter(d => d.snapshot_date && new Date(d.snapshot_date).getTime() === latestDate)
+                : filteredData;
+
+            updateDashboard(latestData);
+        }
+
+        function resetCustomization() {
+            // Reset all checkboxes
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            updateFilters();
+            applyFilters();
+        }
+
+        function resetDateRange() {
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            updateFilters();
+        }
+
+        function updateDashboard(data) {
+            if (!data || data.length === 0) {
+                document.getElementById('dataTable').innerHTML = `
+                    <div class="alert alert-info">
+                        No data matches your current filters. Try adjusting your selection criteria.
+                    </div>
+                `;
+                return;
+            }
+
+            // Update stats
+            const accounts = new Set(data.map(d => `${d.platform}/${d.handle}`));
+            const platforms = new Set(data.map(d => d.platform));
+            const orgs = new Set(data.map(d => d.organization));
+            
+            const totalFollowers = data.reduce((sum, d) => sum + (d.followers_count || 0), 0);
+            const latestDate = data[0]?.snapshot_date;
+
+            document.getElementById('totalAccounts').textContent = accounts.size.toLocaleString();
+            document.getElementById('platformCount').textContent = platforms.size;
+            document.getElementById('totalFollowers').textContent = totalFollowers.toLocaleString();
+            document.getElementById('lastUpdate').textContent = latestDate 
+                ? new Date(latestDate).toLocaleDateString() 
+                : 'N/A';
+
+            // Update charts
+            updateCharts(data);
+
+            // Update table
+            updateTable(data.slice(0, 50)); // Show top 50
+        }
+
+        function updateCharts(data) {
+            // Platform chart
+            const platformData = {};
+            data.forEach(d => {
+                if (!platformData[d.platform]) {
+                    platformData[d.platform] = 0;
+                }
+                platformData[d.platform] += d.followers_count || 0;
+            });
+
+            const platformCtx = document.getElementById('platformChart').getContext('2d');
+            if (platformChart) platformChart.destroy();
+            platformChart = new Chart(platformCtx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(platformData),
+                    datasets: [{
+                        label: 'Followers',
+                        data: Object.values(platformData),
+                        backgroundColor: 'var(--hhs-primary)',
+                        borderColor: 'var(--hhs-primary-dark)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `${context.parsed.y.toLocaleString()} followers`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: (value) => value.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Organization chart
+            const orgData = {};
+            data.forEach(d => {
+                if (!orgData[d.organization]) {
+                    orgData[d.organization] = 0;
+                }
+                orgData[d.organization] += d.followers_count || 0;
+            });
+
+            const sortedOrgs = Object.entries(orgData)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const orgCtx = document.getElementById('organizationChart').getContext('2d');
+            if (organizationChart) organizationChart.destroy();
+            organizationChart = new Chart(orgCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedOrgs.map(o => o[0].substring(0, 30)),
+                    datasets: [{
+                        label: 'Followers',
+                        data: sortedOrgs.map(o => o[1]),
+                        backgroundColor: 'var(--hhs-secondary)',
+                        borderColor: 'var(--hhs-primary)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (context) => `${context.parsed.x.toLocaleString()} followers`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: (value) => value.toLocaleString()
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable(data) {
+            const visibleMetrics = activeFilters.metrics;
+            const tableHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Platform</th>
+                            <th>Handle</th>
+                            <th>Organization</th>
+                            ${visibleMetrics.includes('followers_count') ? '<th>Followers</th>' : ''}
+                            ${visibleMetrics.includes('posts_count') ? '<th>Posts</th>' : ''}
+                            ${visibleMetrics.includes('engagements_total') ? '<th>Engagement</th>' : ''}
+                            ${visibleMetrics.includes('likes_count') ? '<th>Likes</th>' : ''}
+                            ${visibleMetrics.includes('comments_count') ? '<th>Comments</th>' : ''}
+                            ${visibleMetrics.includes('shares_count') ? '<th>Shares</th>' : ''}
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(d => `
+                            <tr>
+                                <td>${d.platform}</td>
+                                <td><strong>${d.handle}</strong></td>
+                                <td>${d.organization}</td>
+                                ${visibleMetrics.includes('followers_count') ? `<td>${(d.followers_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('posts_count') ? `<td>${(d.posts_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('engagements_total') ? `<td>${(d.engagements_total || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('likes_count') ? `<td>${(d.likes_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('comments_count') ? `<td>${(d.comments_count || 0).toLocaleString()}</td>` : ''}
+                                ${visibleMetrics.includes('shares_count') ? `<td>${(d.shares_count || 0).toLocaleString()}</td>` : ''}
+                                <td>${d.snapshot_date ? new Date(d.snapshot_date).toLocaleDateString() : 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('dataTable').innerHTML = tableHTML;
+        }
+
+        function exportCustomizedData() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('No filtered data to export. Apply filters first or load data.');
+                return;
+            }
+
+            // Create filtered export
+            const exportData = {
+                export_date: new Date().toISOString(),
+                total_records: filteredData.length,
+                filters_applied: activeFilters,
+                data: filteredData
+            };
+
+            // Create CSV
+            const headers = ['Platform', 'Handle', 'Organization', 'Date'];
+            activeFilters.metrics.forEach(metric => {
+                const header = metric.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                headers.push(header);
+            });
+
+            let csv = headers.join(',') + '\n';
+            filteredData.forEach(item => {
+                const row = [
+                    item.platform,
+                    item.handle,
+                    item.organization,
+                    item.snapshot_date || ''
+                ];
+                activeFilters.metrics.forEach(metric => {
+                    row.push(item[metric] || 0);
+                });
+                csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hhs_social_media_custom_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+
+            // Also create JSON download
+            const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const jsonUrl = window.URL.createObjectURL(jsonBlob);
+            const jsonA = document.createElement('a');
+            jsonA.href = jsonUrl;
+            jsonA.download = `hhs_social_media_custom_${new Date().toISOString().split('T')[0]}.json`;
+            // Uncomment to also download JSON
+            // jsonA.click();
+        }
+
+        async function triggerWorkflow() {
+            const btn = document.getElementById('triggerBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Triggering...';
+
+            const statusDiv = document.getElementById('workflowStatus');
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <div class="workflow-status">
+                        <div class="spinner"></div>
+                        <strong>Triggering GitHub Actions workflow...</strong> This will run the scraper and update data files.
+                    </div>
+                </div>
+            `;
+
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>Manual Workflow Trigger:</strong><br>
+                    To trigger the scraper, go to the <a href="https://github.com/williamDalston/social-media-scraper/actions" target="_blank">Actions tab</a> 
+                    in your GitHub repository, select "Scrape and Export Data", and click "Run workflow".
+                    <br><br>
+                    The workflow runs automatically daily at 2 AM UTC, or you can trigger it manually from GitHub.
+                </div>
+            `;
+
+            btn.disabled = false;
+            btn.textContent = '🚀 Run Scraper';
+        }
+
+        function refreshData() {
+            const statusDiv = document.getElementById('workflowStatus');
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    Refreshing data...
+                </div>
+            `;
+            loadData().then(() => {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        Data refreshed successfully!
+                    </div>
+                `;
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            });
+        }
+    </script>
 </body>
 </html>
