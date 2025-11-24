@@ -568,6 +568,99 @@ def upload_bulk():
     
     return jsonify({'message': f'Successfully added {count} accounts', 'count': count})
 
+@app.route('/api/job-status/<job_id>', methods=['GET'])
+@limiter.limit("100 per minute")
+@csrf.exempt
+def get_job_status(job_id):
+    """Get status and progress of a running job."""
+    try:
+        from models.job import Job
+        from sqlalchemy.orm import sessionmaker
+        from scraper.schema import init_db
+        import os
+        
+        db_path = os.getenv('DATABASE_PATH', 'social_media.db')
+        engine = init_db(db_path)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        
+        try:
+            job = session.query(Job).filter_by(job_id=job_id).first()
+            
+            if not job:
+                # Try to get status from Celery directly
+                try:
+                    from celery_app import celery_app
+                    task = celery_app.AsyncResult(job_id)
+                    
+                    if task.state == 'PENDING':
+                        return jsonify({
+                            'job_id': job_id,
+                            'status': 'pending',
+                            'progress': 0,
+                            'message': 'Job is pending...'
+                        })
+                    elif task.state == 'PROGRESS':
+                        info = task.info if task.info else {}
+                        return jsonify({
+                            'job_id': job_id,
+                            'status': 'running',
+                            'progress': info.get('progress', 0),
+                            'message': info.get('message', 'Running...'),
+                            'processed': info.get('processed', 0),
+                            'total': info.get('total', 0),
+                            'speed': info.get('speed', 0),
+                            'eta': info.get('eta', '--')
+                        })
+                    elif task.state == 'SUCCESS':
+                        return jsonify({
+                            'job_id': job_id,
+                            'status': 'completed',
+                            'progress': 100,
+                            'message': 'Job completed successfully',
+                            'result': task.result if task.result else {}
+                        })
+                    elif task.state == 'FAILURE':
+                        return jsonify({
+                            'job_id': job_id,
+                            'status': 'failed',
+                            'progress': 0,
+                            'message': str(task.info) if task.info else 'Job failed'
+                        })
+                except ImportError:
+                    pass
+            
+            # Return database job status
+            result_data = {}
+            if job.result:
+                try:
+                    import json
+                    result_data = json.loads(job.result) if isinstance(job.result, str) else job.result
+                except:
+                    result_data = {'raw': str(job.result)}
+            
+            return jsonify({
+                'job_id': job.job_id,
+                'status': job.status,
+                'progress': job.progress or 0,
+                'message': result_data.get('message', job.status),
+                'error_message': job.error_message,
+                'result': result_data,
+                'created_at': job.created_at.isoformat() if job.created_at else None,
+                'started_at': job.started_at.isoformat() if job.started_at else None,
+                'completed_at': job.completed_at.isoformat() if job.completed_at else None
+            })
+        finally:
+            session.close()
+            engine.dispose()
+    except Exception as e:
+        logger.exception("Error getting job status")
+        return jsonify({
+            'error': f'Error getting job status: {str(e)}',
+            'job_id': job_id
+        }), 500
+
+
 @app.route('/api/run-scraper', methods=['POST'])
 @limiter.limit("5 per hour")
 @csrf.exempt  # CSRF exempt for API endpoints
@@ -617,50 +710,79 @@ def run_scraper():
         logger.warning(f"Pre-flight checks encountered an error (continuing anyway): {str(e)}")
         preflight_results = None
     
+    # Use Celery async job for background processing
     try:
-        from scraper.collect_metrics import simulate_metrics
-        import time
-        start_time = time.time()
-        simulate_metrics(db_path=db_path, mode=mode, parallel=True, max_workers=5)
-        elapsed_time = time.time() - start_time
+        from tasks.scraper_tasks import scrape_all_accounts
+        from tasks.utils import create_job_record
         
-        # Record scraper metrics (if available)
+        # Trigger async Celery task
+        task = scrape_all_accounts.delay(mode=mode, db_path=db_path)
+        job_id = task.id
+        
+        # Create job record for tracking
         try:
-            metrics = get_metrics()
-            metrics.record_scraper_execution(elapsed_time, success=True)
-        except:
-            pass  # Metrics not required for basic functionality
-        
-        # Log scraper run (if user is authenticated)
-        if user:
-            try:
-                log_security_event(
-                    AuditEventType.SCRAPER_RUN,
-                    user_id=user.id,
-                    username=user.username,
-                    resource_type='scraper',
-                    action='run',
-                    details={'mode': mode, 'execution_time': elapsed_time},
-                    success=True
-                )
-            except:
-                pass  # Logging not required for basic functionality
-        
-        # Invalidate all caches after scraping (if available)
-        try:
-            invalidate_summary_cache()
-            invalidate_grid_cache()
-            invalidate_accounts_list_cache()
-        except:
-            pass  # Cache invalidation not required for basic functionality
+            create_job_record(job_id, 'scrape_all', db_path=db_path)
+        except Exception as e:
+            logger.warning(f"Could not create job record: {e}")
         
         return jsonify({
-            'message': 'Scraper finished successfully',
-            'execution_time': round(elapsed_time, 2),
+            'message': 'Scraper job started successfully',
+            'job_id': job_id,
+            'status': 'pending',
             'success': True,
             'account_count': preflight_results.get('account_count', 0) if preflight_results else None,
             'checks': preflight_results.get('checks', []) if preflight_results else None
         })
+    except ImportError:
+        # Celery not available - fall back to synchronous execution
+        logger.warning("Celery not available, running scraper synchronously")
+        try:
+            from scraper.collect_metrics import simulate_metrics
+            import time
+            start_time = time.time()
+            simulate_metrics(db_path=db_path, mode=mode, parallel=True, max_workers=5)
+            elapsed_time = time.time() - start_time
+            
+            # Record scraper metrics (if available)
+            try:
+                metrics = get_metrics()
+                metrics.record_scraper_execution(elapsed_time, success=True)
+            except:
+                pass
+            
+            # Log scraper run (if user is authenticated)
+            if user:
+                try:
+                    log_security_event(
+                        AuditEventType.SCRAPER_RUN,
+                        user_id=user.id,
+                        username=user.username,
+                        resource_type='scraper',
+                        action='run',
+                        details={'mode': mode, 'execution_time': elapsed_time},
+                        success=True
+                    )
+                except:
+                    pass
+            
+            # Invalidate all caches after scraping (if available)
+            try:
+                invalidate_summary_cache()
+                invalidate_grid_cache()
+                invalidate_accounts_list_cache()
+            except:
+                pass
+            
+            return jsonify({
+                'message': 'Scraper finished successfully',
+                'execution_time': round(elapsed_time, 2),
+                'success': True,
+                'job_id': None,  # No job ID for sync execution
+                'status': 'completed',
+                'account_count': preflight_results.get('account_count', 0) if preflight_results else None,
+                'checks': preflight_results.get('checks', []) if preflight_results else None
+            })
+        except Exception as sync_error:
     except Exception as e:
         # Record failure (if metrics available)
         try:

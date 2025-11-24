@@ -1205,34 +1205,55 @@
                     }
                 }
                 
-                // Check if there were any pre-flight warnings (even if successful)
-                let warningHtml = '';
-                if (result.checks && result.checks.length > 0) {
-                    const warnings = result.checks.filter(c => !c.passed).map(c => `⚠️ ${c.name}: ${c.message}`).join('<br>');
-                    if (warnings) {
-                        warningHtml = `<div class="alert" style="background-color: #f59e0b; color: white; margin-top: 10px;"><strong>Pre-flight Warnings:</strong><br>${warnings}</div>`;
+                // If we have a job_id, start polling for progress
+                if (result.job_id) {
+                    startJobProgressTracking(result.job_id, statusDiv, btn, originalText, result);
+                } else if (result.status === 'completed') {
+                    // Synchronous execution completed immediately
+                    let warningHtml = '';
+                    if (result.checks && result.checks.length > 0) {
+                        const warnings = result.checks.filter(c => !c.passed).map(c => `⚠️ ${c.name}: ${c.message}`).join('<br>');
+                        if (warnings) {
+                            warningHtml = `<div class="alert" style="background-color: #f59e0b; color: white; margin-top: 10px;"><strong>Pre-flight Warnings:</strong><br>${warnings}</div>`;
+                        }
                     }
+                    
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Scraper Completed Successfully!</strong><br>
+                            ${result.message || 'The scraper has finished.'}
+                            ${result.execution_time ? `<br><small>Execution time: ${result.execution_time} seconds</small>` : ''}
+                            ${result.account_count ? `<br><small>Scraped ${result.account_count} accounts</small>` : ''}
+                            ${warningHtml}
+                            <br><br>
+                            <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                                🔄 Refresh Data
+                            </button>
+                        </div>
+                    `;
+                    
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    
+                    // Auto-refresh data
+                    setTimeout(() => {
+                        refreshData();
+                    }, 2000);
+                } else {
+                    // Fallback for other cases
+                    statusDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Scraper Started!</strong><br>
+                            ${result.message || 'The scraper is now running.'}
+                            <br><br>
+                            <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                                🔄 Refresh Data
+                            </button>
+                        </div>
+                    `;
+                    btn.disabled = false;
+                    btn.textContent = originalText;
                 }
-                
-                statusDiv.innerHTML = `
-                    <div class="alert alert-success">
-                        <strong>✅ Scraper Started Successfully!</strong><br>
-                        ${result.message || 'The scraper is now running. This may take a few minutes to complete.'}
-                        ${result.job_id ? `<br><small>Job ID: ${result.job_id}</small>` : ''}
-                        ${result.execution_time ? `<br><small>Execution time: ${result.execution_time} seconds</small>` : ''}
-                        ${result.account_count ? `<br><small>Scraping ${result.account_count} accounts</small>` : ''}
-                        ${warningHtml}
-                        <br><br>
-                        <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
-                            🔄 Refresh Data
-                        </button>
-                    </div>
-                `;
-                
-                // Auto-refresh data after 10 seconds
-                setTimeout(() => {
-                    refreshData();
-                }, 10000);
                 
             } catch (error) {
                 // API not available - show instructions for running locally
@@ -1279,6 +1300,160 @@
             
             btn.disabled = false;
             btn.textContent = originalText;
+        }
+
+        function startJobProgressTracking(jobId, statusDiv, btn, originalText, initialResult) {
+            // Create progress bar HTML
+            statusDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <strong>🚀 Scraper Job Started!</strong><br>
+                    <div style="margin-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span id="progressMessage">Initializing...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div style="background-color: rgba(255,255,255,0.1); border-radius: 10px; height: 25px; overflow: hidden; position: relative;">
+                            <div id="progressBar" style="background: linear-gradient(90deg, #10b981 0%, #059669 100%); height: 100%; width: 0%; transition: width 0.3s ease; border-radius: 10px;"></div>
+                        </div>
+                        <div id="progressDetails" style="margin-top: 10px; font-size: 0.9em; color: rgba(255,255,255,0.7);">
+                            <span id="progressStats"></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            let pollCount = 0;
+            const maxPolls = 600; // Poll for up to 10 minutes (600 * 1 second)
+            
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+                
+                try {
+                    const statusResponse = await fetch(`/api/job-status/${jobId}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+                        }
+                    });
+                    
+                    if (!statusResponse.ok) {
+                        throw new Error(`Status check failed: ${statusResponse.status}`);
+                    }
+                    
+                    const statusData = await statusResponse.json();
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('progressBar');
+                    const progressPercent = document.getElementById('progressPercent');
+                    const progressMessage = document.getElementById('progressMessage');
+                    const progressStats = document.getElementById('progressStats');
+                    
+                    if (progressBar && progressPercent && progressMessage) {
+                        const progress = Math.min(100, Math.max(0, statusData.progress || 0));
+                        progressBar.style.width = progress + '%';
+                        progressPercent.textContent = progress.toFixed(0) + '%';
+                        progressMessage.textContent = statusData.message || 'Running...';
+                        
+                        // Add stats if available
+                        if (progressStats && statusData.processed !== undefined && statusData.total !== undefined) {
+                            let statsText = `Processed: ${statusData.processed} / ${statusData.total}`;
+                            if (statusData.speed) {
+                                statsText += ` | Speed: ${statusData.speed.toFixed(2)} accounts/sec`;
+                            }
+                            if (statusData.eta && statusData.eta !== '--') {
+                                statsText += ` | ETA: ${statusData.eta}`;
+                            }
+                            progressStats.textContent = statsText;
+                        }
+                    }
+                    
+                    // Check if job is complete
+                    if (statusData.status === 'completed') {
+                        clearInterval(pollInterval);
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        
+                        let warningHtml = '';
+                        if (initialResult.checks && initialResult.checks.length > 0) {
+                            const warnings = initialResult.checks.filter(c => !c.passed).map(c => `⚠️ ${c.name}: ${c.message}`).join('<br>');
+                            if (warnings) {
+                                warningHtml = `<div class="alert" style="background-color: #f59e0b; color: white; margin-top: 10px;"><strong>Pre-flight Warnings:</strong><br>${warnings}</div>`;
+                            }
+                        }
+                        
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-success">
+                                <strong>✅ Scraper Completed Successfully!</strong><br>
+                                ${statusData.message || 'The scraper has finished.'}
+                                ${statusData.result && statusData.result.total_accounts ? `<br><small>Scraped ${statusData.result.total_accounts} accounts</small>` : ''}
+                                ${warningHtml}
+                                <br><br>
+                                <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                                    🔄 Refresh Data
+                                </button>
+                            </div>
+                        `;
+                        
+                        // Auto-refresh data
+                        setTimeout(() => {
+                            refreshData();
+                        }, 2000);
+                    } else if (statusData.status === 'failed') {
+                        clearInterval(pollInterval);
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                        
+                        statusDiv.innerHTML = `
+                            <div class="alert" style="background-color: #dc2626; color: white;">
+                                <strong>❌ Scraper Failed</strong><br>
+                                ${statusData.message || statusData.error_message || 'An error occurred during scraping.'}
+                                <br><br>
+                                <button class="btn btn-secondary" onclick="triggerWorkflow()" style="margin-top: 10px;">
+                                    🔄 Try Again
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    // Stop polling if we've exceeded max polls
+                    if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                        if (statusData.status === 'running' || statusData.status === 'pending') {
+                            statusDiv.innerHTML = `
+                                <div class="alert alert-warning">
+                                    <strong>⏱️ Job Still Running</strong><br>
+                                    The scraper is taking longer than expected. It may still be running in the background.
+                                    <br><br>
+                                    <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                                        🔄 Refresh Data
+                                    </button>
+                                </div>
+                            `;
+                            btn.disabled = false;
+                            btn.textContent = originalText;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error polling job status:', error);
+                    // Continue polling on error, but log it
+                    if (pollCount >= 10) {
+                        // Stop after 10 failed polls
+                        clearInterval(pollInterval);
+                        statusDiv.innerHTML = `
+                            <div class="alert alert-warning">
+                                <strong>⚠️ Could Not Track Progress</strong><br>
+                                The scraper may still be running, but we couldn't track its progress.
+                                <br><br>
+                                <button class="btn btn-primary" onclick="refreshData()" style="margin-top: 10px;">
+                                    🔄 Refresh Data
+                                </button>
+                            </div>
+                        `;
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }
+                }
+            }, 1000); // Poll every second
         }
 
         function refreshData() {
