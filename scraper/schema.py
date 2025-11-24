@@ -139,6 +139,63 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     
     logger = logging.getLogger(__name__)
     
+    # ABSOLUTE FIRST CHECK: If it's 'social_media.db' or ends in .db, handle immediately
+    # This check happens BEFORE any other logic, imports, or validation
+    # This is the ultimate safety net
+    db_path_str = str(db_path).strip() if db_path else ''
+    if db_path_str and (db_path_str.endswith('.db') or db_path_str.endswith('.DB') or db_path_str == 'social_media.db' or 'social_media.db' in db_path_str):
+        print(f"[INIT_DB ULTIMATE CHECK] Detected .db file at START: '{db_path_str}'", file=sys.stderr, flush=True)
+        # Construct SQLite URL immediately
+        if db_path_str.startswith('sqlite:///'):
+            sqlite_url = db_path_str
+        elif db_path_str.startswith('sqlite://'):
+            sqlite_url = db_path_str.replace('sqlite://', 'sqlite:///', 1)
+        else:
+            # Make absolute path
+            abs_path = os.path.abspath(db_path_str) if not os.path.isabs(db_path_str) else db_path_str
+            # Normalize path separators
+            normalized = abs_path.replace('\\', '/').replace('//', '/')
+            sqlite_url = f'sqlite:///{normalized}'
+        
+        print(f"[INIT_DB ULTIMATE CHECK] SQLite URL: '{sqlite_url}'", file=sys.stderr, flush=True)
+        
+        # Validate URL format
+        if not sqlite_url.startswith('sqlite:///'):
+            raise ValueError(f"Invalid SQLite URL in ultimate check: '{sqlite_url}'")
+        
+        # Create engine immediately
+        try:
+            engine = create_engine(
+                sqlite_url,
+                poolclass=NullPool,
+                connect_args={'check_same_thread': False, 'timeout': 20},
+                echo=False
+            )
+            print(f"[INIT_DB ULTIMATE CHECK] Engine created successfully!", file=sys.stderr, flush=True)
+            
+            # Import Job model
+            from models.job import Job  # noqa: F401
+            
+            # Continue with initialization
+            if enable_profiling:
+                try:
+                    from config.database_performance import setup_query_monitoring
+                    setup_query_monitoring(engine)
+                except Exception:
+                    pass
+                try:
+                    from scraper.utils.query_profiler import setup_query_listening
+                    setup_query_listening(engine)
+                except Exception:
+                    pass
+            
+            Base.metadata.create_all(engine)
+            _ensure_indexes(engine, db_path_str)
+            return engine
+        except Exception as e:
+            print(f"[INIT_DB ULTIMATE CHECK] Error creating engine: {e}", file=sys.stderr, flush=True)
+            raise ValueError(f"Failed to create SQLite engine (ultimate check) with URL '{sqlite_url}': {e}") from e
+    
     # PREEMPTIVE VALIDATION: Use the normalization utility to catch errors early
     try:
         from scraper.utils.db_path_normalizer import normalize_db_path, validate_sqlite_url
