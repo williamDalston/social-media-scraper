@@ -142,8 +142,18 @@ def init_db(db_path='social_media.db', enable_profiling: bool = False):
     # ABSOLUTE FIRST CHECK: If it's 'social_media.db' or ends in .db, handle immediately
     # This check happens BEFORE any other logic, imports, or validation
     # This is the ultimate safety net
-    db_path_str = str(db_path).strip() if db_path else ''
-    if db_path_str and (db_path_str.endswith('.db') or db_path_str.endswith('.DB') or db_path_str == 'social_media.db' or 'social_media.db' in db_path_str):
+    # Use the simplest possible check to ensure it always works
+    try:
+        db_path_str = str(db_path).strip() if db_path else ''
+    except Exception:
+        db_path_str = ''
+    
+    # SIMPLEST POSSIBLE CHECK - just look for .db at the end
+    is_db_file_simple = False
+    if db_path_str:
+        is_db_file_simple = db_path_str.endswith('.db') or db_path_str.endswith('.DB')
+    
+    if is_db_file_simple:
         print(f"[INIT_DB ULTIMATE CHECK] Detected .db file at START: '{db_path_str}'", file=sys.stderr, flush=True)
         # Construct SQLite URL immediately
         if db_path_str.startswith('sqlite:///'):
