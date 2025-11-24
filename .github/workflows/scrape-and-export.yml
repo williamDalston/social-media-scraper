@@ -97,12 +97,27 @@ jobs:
           grep -n "USING NEW FIXED VERSION" scraper/schema.py || (echo "ERROR: Debug marker not found!" && exit 1)
           echo "✓ schema.py verification passed - new version confirmed"
       
-      - name: Initialize database
+      - name: Initialize database (debug - see what's actually imported)
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
           DATABASE_URL: sqlite:///social_media.db
-        run: python -c "from scraper.schema import init_db; init_db('sqlite:///social_media.db')"
+        run: |
+          python - << 'EOF'
+          import inspect
+          import scraper.schema as schema
+          
+          print(">>> schema module file:", schema.__file__)
+          print(">>> init_db defined at line:", schema.init_db.__code__.co_firstlineno)
+          print(">>> First 20 lines of init_db source:")
+          source_lines = inspect.getsource(schema.init_db).splitlines()
+          for i, line in enumerate(source_lines[:20], 1):
+              print(f"{i:3}: {line}")
+          
+          print("\n>>> Calling init_db('sqlite:///social_media.db') ...")
+          schema.init_db("sqlite:///social_media.db")
+          print(">>> SUCCESS: Database initialized!")
+          EOF
       
       - name: Populate accounts
         env:
