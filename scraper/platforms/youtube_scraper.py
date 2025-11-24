@@ -20,8 +20,8 @@ class YouTubeScraper(BasePlatformScraper):
 
     API_BASE_URL = "https://www.googleapis.com/youtube/v3"
 
-    def __init__(self):
-        super().__init__("youtube")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("youtube", max_sleep_seconds=max_sleep_seconds)
         self.api_key = ScraperConfig.YOUTUBE_API_KEY
 
         if not self.api_key:

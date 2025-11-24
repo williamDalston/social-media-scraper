@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class FlickrScraper(BasePlatformScraper):
     """Scraper for Flickr accounts."""
 
-    def __init__(self):
-        super().__init__("flickr")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("flickr", max_sleep_seconds=max_sleep_seconds)
 
     def _extract_user_id_from_url(self, url: str) -> Optional[str]:
         """

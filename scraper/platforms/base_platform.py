@@ -13,7 +13,7 @@ from ..utils.errors import (
     PrivateAccountError,
     NetworkError,
 )
-from ..utils.rate_limiter import get_rate_limiter
+from ..utils.rate_limiter import get_rate_limiter, RateLimitExceeded
 from ..utils.proxy_manager import get_proxy_manager
 from ..utils.retry import retry_with_backoff
 from ..utils.validators import validate_scraped_data
@@ -29,15 +29,16 @@ class BasePlatformScraper(ABC):
     Provides common functionality like rate limiting, retry logic, and error handling.
     """
 
-    def __init__(self, platform: str):
+    def __init__(self, platform: str, max_sleep_seconds: Optional[float] = None):
         """
         Initialize base scraper.
 
         Args:
             platform: Platform name (e.g., 'x', 'instagram', 'youtube')
+            max_sleep_seconds: Maximum time to sleep when rate limited. If None, waits indefinitely.
         """
         self.platform = platform
-        self.rate_limiter = get_rate_limiter(platform)
+        self.rate_limiter = get_rate_limiter(platform, max_sleep_seconds=max_sleep_seconds)
         self.proxy_manager = get_proxy_manager() if ScraperConfig.USE_PROXY else None
         self.timeout = get_timeout(platform)
         self.max_retries = get_retry_count(platform)
@@ -148,6 +149,9 @@ class BasePlatformScraper(ABC):
             return None
         except RateLimitError as e:
             logger.error(f"Rate limit exceeded for {self.platform}: {e}")
+            return None
+        except RateLimitExceeded as e:
+            logger.warning(f"Rate limit wait time too long for {self.platform}, skipping: {e}")
             return None
         except ScraperError as e:
             logger.error(f"Scraper error for {self.platform}: {e}")

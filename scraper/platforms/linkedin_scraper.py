@@ -28,8 +28,8 @@ except ImportError:
 class LinkedInScraper(BasePlatformScraper):
     """Scraper for LinkedIn company/showcase pages."""
 
-    def __init__(self):
-        super().__init__("linkedin")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("linkedin", max_sleep_seconds=max_sleep_seconds)
 
     def _extract_identifier_from_url(self, url: str) -> Optional[str]:
         """

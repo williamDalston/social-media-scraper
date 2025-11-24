@@ -31,8 +31,8 @@ class FacebookScraper(BasePlatformScraper):
 
     GRAPH_API_BASE = "https://graph.facebook.com/v18.0"
 
-    def __init__(self):
-        super().__init__("facebook")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("facebook", max_sleep_seconds=max_sleep_seconds)
         self.access_token = ScraperConfig.FACEBOOK_ACCESS_TOKEN
 
         if not self.access_token:

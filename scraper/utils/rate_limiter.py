@@ -11,6 +11,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+class RateLimitExceeded(Exception):
+    """Raised when rate limit wait time exceeds max_sleep_seconds."""
+    pass
+
+
 class RateLimiter:
     """
     Thread-safe rate limiter for controlling request frequency.
@@ -32,6 +37,7 @@ class RateLimiter:
         platform: str,
         requests: Optional[int] = None,
         window: Optional[int] = None,
+        max_sleep_seconds: Optional[float] = None,
     ):
         """
         Initialize rate limiter for a platform.
@@ -40,9 +46,12 @@ class RateLimiter:
             platform: Platform name
             requests: Number of requests allowed (defaults to platform default)
             window: Time window in seconds (defaults to platform default)
+            max_sleep_seconds: Maximum time to sleep when rate limited. If None, waits indefinitely.
+                              If exceeded, raises RateLimitExceeded exception instead of sleeping.
         """
         self.platform = platform
         self.lock = threading.Lock()
+        self.max_sleep_seconds = max_sleep_seconds
 
         if requests is None or window is None:
             requests, window = self.DEFAULT_LIMITS.get(platform, (10, 3600))
@@ -53,11 +62,15 @@ class RateLimiter:
 
         logger.info(
             f"Rate limiter initialized for {platform}: {requests} requests per {window} seconds"
+            + (f" (max sleep: {max_sleep_seconds}s)" if max_sleep_seconds else "")
         )
 
     def wait_if_needed(self):
         """
         Wait if rate limit would be exceeded, otherwise record the request.
+        
+        Raises:
+            RateLimitExceeded: If max_sleep_seconds is set and wait time exceeds it
         """
         with self.lock:
             now = time.time()
@@ -74,6 +87,15 @@ class RateLimiter:
                     self.window - (now - oldest_request) + 0.1
                 )  # Add small buffer
                 if wait_time > 0:
+                    # Check if wait time exceeds max_sleep_seconds
+                    if self.max_sleep_seconds is not None and wait_time > self.max_sleep_seconds:
+                        logger.warning(
+                            f"Rate limit sleep {wait_time:.2f}s for {self.platform} exceeds cap {self.max_sleep_seconds}s; skipping."
+                        )
+                        raise RateLimitExceeded(
+                            f"Rate limit wait time {wait_time:.2f}s exceeds max {self.max_sleep_seconds}s for {self.platform}"
+                        )
+                    
                     logger.info(
                         f"Rate limit reached for {self.platform}. Waiting {wait_time:.2f} seconds..."
                     )
@@ -107,17 +129,21 @@ _rate_limiters: Dict[str, RateLimiter] = {}
 _rate_limiter_lock = threading.Lock()
 
 
-def get_rate_limiter(platform: str) -> RateLimiter:
+def get_rate_limiter(platform: str, max_sleep_seconds: Optional[float] = None) -> RateLimiter:
     """
     Get or create a rate limiter for a platform.
 
     Args:
         platform: Platform name
+        max_sleep_seconds: Maximum time to sleep when rate limited. If None, waits indefinitely.
 
     Returns:
         RateLimiter instance for the platform
     """
     with _rate_limiter_lock:
-        if platform not in _rate_limiters:
-            _rate_limiters[platform] = RateLimiter(platform)
-        return _rate_limiters[platform]
+        # Create a key that includes max_sleep_seconds to allow different limiters
+        # for different modes (fast_daily vs full_backfill)
+        cache_key = f"{platform}:{max_sleep_seconds}"
+        if cache_key not in _rate_limiters:
+            _rate_limiters[cache_key] = RateLimiter(platform, max_sleep_seconds=max_sleep_seconds)
+        return _rate_limiters[cache_key]

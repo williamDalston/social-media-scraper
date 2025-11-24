@@ -3,6 +3,7 @@ import logging
 import sys
 import os
 from datetime import date, timedelta
+from typing import Optional, List
 from sqlalchemy.orm import sessionmaker
 from scraper.schema import DimAccount, FactFollowersSnapshot, FactSocialPost, init_db
 from scraper.scrapers import get_scraper
@@ -47,21 +48,57 @@ def simulate_metrics(
     max_workers=5,
     progress_callback=None,
     account_keys=None,
+    max_accounts: Optional[int] = None,
+    limit_platforms: Optional[List[str]] = None,
+    max_sleep_seconds: Optional[float] = None,
+    snapshot_only: bool = False,
+    allow_browser: bool = True,
 ):
     """
     Collect metrics for all accounts or specific accounts.
 
     Args:
         db_path: Path to database file
-        mode: Scraper mode ('simulated' or 'real')
+        mode: Scraper mode ('fast_daily', 'full_backfill', 'real', or 'demo')
+            - 'fast_daily': Quick daily snapshot, skips long waits, snapshot-only
+            - 'full_backfill': Deep scrape with full history, allows long waits
+            - 'real': Standard real scraping (default)
+            - 'demo': Small sample for testing
         parallel: If True, use parallel scraping (default: True)
         max_workers: Number of parallel workers (default: 5)
         progress_callback: Optional callback function(processed, total, current_account, speed, elapsed)
         account_keys: Optional list of account keys to scrape. If None, scrapes all active accounts.
+        max_accounts: Maximum number of accounts to scrape (None = all)
+        limit_platforms: List of platform names to scrape (None = all platforms)
+        max_sleep_seconds: Maximum time to sleep when rate limited (None = wait indefinitely)
+        snapshot_only: If True, only fetch current metrics, don't crawl history
+        allow_browser: If False, skip browser automation (faster but may miss data)
     """
     import time
 
     start_time = time.time()
+
+    # Apply mode-specific defaults
+    if mode == "fast_daily":
+        if max_sleep_seconds is None:
+            max_sleep_seconds = 60  # 1 minute max wait for daily runs
+        if snapshot_only is False:
+            snapshot_only = True  # Force snapshot-only for fast_daily
+        if max_workers is None or max_workers > 5:
+            max_workers = min(max_workers or 5, 5)  # Limit concurrency for daily runs
+        if limit_platforms is None:
+            # Default to more reliable platforms for daily runs
+            limit_platforms = ["youtube", "instagram", "linkedin", "x"]
+    elif mode == "full_backfill":
+        if max_sleep_seconds is None:
+            max_sleep_seconds = 600  # 10 minutes max wait for backfill
+        if max_workers is None or max_workers > 3:
+            max_workers = min(max_workers or 3, 3)  # Lower concurrency for backfill
+    elif mode == "demo":
+        if max_accounts is None:
+            max_accounts = 5  # Small sample for demo
+        if max_sleep_seconds is None:
+            max_sleep_seconds = 30  # Short waits for demo
 
     engine = init_db(db_path)
     Session = sessionmaker(bind=engine)
@@ -83,9 +120,30 @@ def simulate_metrics(
             .all()
         )
 
+    # Apply platform filter
+    if limit_platforms:
+        limit_platforms_lower = [p.lower() for p in limit_platforms]
+        accounts = [
+            acc for acc in accounts
+            if acc.platform and acc.platform.lower() in limit_platforms_lower
+        ]
+        logger.info(
+            f"Filtered to {len(accounts)} accounts matching platforms: {limit_platforms}",
+            extra={"limit_platforms": limit_platforms, "filtered_count": len(accounts)}
+        )
+
+    # Apply max_accounts limit
+    if max_accounts is not None and max_accounts > 0:
+        original_count = len(accounts)
+        accounts = accounts[:max_accounts]
+        logger.info(
+            f"Limited to {len(accounts)} accounts (from {original_count})",
+            extra={"max_accounts": max_accounts, "original_count": original_count}
+        )
+
     today = date.today()
 
-    scraper = get_scraper(mode)
+    scraper = get_scraper(mode, max_sleep_seconds=max_sleep_seconds)
     logger.info(
         "Starting metrics collection",
         extra={

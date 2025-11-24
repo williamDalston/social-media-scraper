@@ -95,9 +95,15 @@ class RealScraper(BaseScraper):
         "flickr": FlickrScraper,
     }
 
-    def __init__(self):
-        """Initialize the real scraper with platform-specific scrapers."""
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        """
+        Initialize the real scraper with platform-specific scrapers.
+        
+        Args:
+            max_sleep_seconds: Maximum time to sleep when rate limited. If None, waits indefinitely.
+        """
         self._scrapers = {}
+        self.max_sleep_seconds = max_sleep_seconds
         logger.info("Initialized RealScraper with platform-specific scrapers")
 
     def _get_scraper_for_platform(self, platform: str):
@@ -138,9 +144,22 @@ class RealScraper(BaseScraper):
 
         # Create and cache scraper instance
         try:
-            scraper = scraper_class()
+            # All platform scrapers now accept max_sleep_seconds
+            scraper = scraper_class(max_sleep_seconds=self.max_sleep_seconds)
             self._scrapers[platform] = scraper
             return scraper
+        except TypeError:
+            # Fallback for scrapers that don't accept max_sleep_seconds yet
+            try:
+                scraper = scraper_class()
+                # Manually update rate limiter if scraper has one
+                if hasattr(scraper, 'rate_limiter'):
+                    scraper.rate_limiter.max_sleep_seconds = self.max_sleep_seconds
+                self._scrapers[platform] = scraper
+                return scraper
+            except Exception as e:
+                logger.error(f"Failed to initialize scraper for {platform}: {e}")
+                return None
         except Exception as e:
             logger.error(f"Failed to initialize scraper for {platform}: {e}")
             return None
@@ -220,12 +239,13 @@ class RealScraper(BaseScraper):
             return None
 
 
-def get_scraper(mode="real"):
+def get_scraper(mode="real", max_sleep_seconds: Optional[float] = None):
     """
     Get a scraper instance.
 
     Args:
         mode: 'real' for real scraping (simulated mode disabled)
+        max_sleep_seconds: Maximum time to sleep when rate limited. If None, waits indefinitely.
 
     Returns:
         Scraper instance (always RealScraper)
@@ -235,4 +255,4 @@ def get_scraper(mode="real"):
         logger.warning(
             f"Simulated mode requested but disabled. Using real scraper instead."
         )
-    return RealScraper()
+    return RealScraper(max_sleep_seconds=max_sleep_seconds)

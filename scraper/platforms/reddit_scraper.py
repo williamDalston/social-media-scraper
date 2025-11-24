@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 class RedditScraper(BasePlatformScraper):
     """Scraper for Reddit subreddits and users."""
 
-    def __init__(self):
-        super().__init__("reddit")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("reddit", max_sleep_seconds=max_sleep_seconds)
 
     def _extract_subreddit_from_url(self, url: str) -> Optional[str]:
         """

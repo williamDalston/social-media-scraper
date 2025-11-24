@@ -28,8 +28,8 @@ except ImportError:
 class InstagramScraper(BasePlatformScraper):
     """Scraper for Instagram accounts."""
 
-    def __init__(self):
-        super().__init__("instagram")
+    def __init__(self, max_sleep_seconds: Optional[float] = None):
+        super().__init__("instagram", max_sleep_seconds=max_sleep_seconds)
 
     def _extract_username_from_url(self, url: str) -> Optional[str]:
         """
