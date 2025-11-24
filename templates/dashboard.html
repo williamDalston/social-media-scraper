@@ -335,8 +335,10 @@
             </div>
         </div>
         <nav style="display: flex; gap: 10px; align-items: center;" role="toolbar" aria-label="Main actions">
-                <button onclick="document.getElementById('fileInput').click()" class="btn"
-                style="background-color: #475569;" aria-label="Upload CSV file" data-tooltip="Upload a CSV file with social media accounts to track">Upload CSV</button>
+            <button onclick="showBulkUploadModal()" class="btn"
+                style="background-color: #475569;" aria-label="Add accounts in bulk" data-tooltip="Add multiple accounts at once by pasting CSV data">Add Accounts</button>
+            <button onclick="document.getElementById('fileInput').click()" class="btn"
+                style="background-color: #334155;" aria-label="Upload CSV file" data-tooltip="Upload a CSV file with social media accounts to track">Upload CSV</button>
             <input type="file" id="fileInput" style="display: none;" accept=".csv" onchange="uploadCSV(this)" aria-label="CSV file input">
 
             <button onclick="runScraper()" class="btn" id="runScraperBtn" aria-label="Run scraper to collect real metrics" data-tooltip="Run the scraper to collect real metrics from all tracked accounts. This may take a few minutes.">Run Scraper</button>
@@ -492,6 +494,75 @@
     <div id="grid-view" class="view-section">
         <div id="table-wrapper">
             <div class="loading-spinner" id="gridLoading"></div>
+        </div>
+    </div>
+
+    <!-- Bulk Upload Modal -->
+    <div id="bulkUploadModal" class="modal-overlay" style="display: none; z-index: 10001;" role="dialog" aria-labelledby="bulk-upload-title" aria-modal="true">
+        <div class="modal-dialog" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2 id="bulk-upload-title" class="modal-title">Add Accounts in Bulk</h2>
+                <button class="modal-close" aria-label="Close dialog" onclick="closeBulkUploadModal()">
+                    <span aria-hidden="true">×</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 20px;">
+                    <p style="color: var(--text-secondary); margin-bottom: 15px;">
+                        Paste your account data below. Use the template format shown or copy from a spreadsheet.
+                    </p>
+                    
+                    <!-- Template Section -->
+                    <div style="background: var(--card-bg); border: 1px solid #334155; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h3 style="margin: 0; font-size: 14px; font-weight: 600; color: var(--text-primary);">Template Format:</h3>
+                            <button onclick="copyTemplate()" class="btn" style="padding: 6px 12px; font-size: 12px; background: var(--accent);" title="Copy template">
+                                📋 Copy Template
+                            </button>
+                        </div>
+                        <pre id="templateText" style="background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 0; font-size: 12px; color: var(--text-primary); font-family: 'Courier New', monospace; white-space: pre;">Platform,Handle,Organization
+X,@hhsgov,Health and Human Services
+Instagram,hhsgov,Health and Human Services
+Facebook,HHS,Health and Human Services
+LinkedIn,company/hhs,Health and Human Services
+YouTube,@hhsgov,Health and Human Services</pre>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-top: 10px; margin-bottom: 0;">
+                            <strong>Supported platforms:</strong> X, Instagram, Facebook, LinkedIn, YouTube, Truth Social, Flickr
+                        </p>
+                    </div>
+
+                    <!-- Text Area -->
+                    <div style="margin-bottom: 15px;">
+                        <label for="bulkUploadTextarea" style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                            Paste your CSV data here:
+                        </label>
+                        <textarea 
+                            id="bulkUploadTextarea" 
+                            rows="12" 
+                            placeholder="Paste CSV data here, or copy from the template above..."
+                            style="width: 100%; padding: 12px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: var(--text-primary); font-family: 'Courier New', monospace; font-size: 13px; resize: vertical; box-sizing: border-box;"
+                            aria-label="CSV data input"
+                        ></textarea>
+                        <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+                            <span style="font-size: 11px; color: var(--text-secondary);">
+                                Tip: You can paste directly from Excel, Google Sheets, or any CSV file
+                            </span>
+                            <button onclick="clearBulkUpload()" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 11px; padding: 4px 8px;" title="Clear textarea">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Error/Success Messages -->
+                    <div id="bulkUploadMessages" style="display: none;"></div>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 15px; border-top: 1px solid #334155;">
+                <button onclick="closeBulkUploadModal()" class="btn" style="background: #475569;">Cancel</button>
+                <button onclick="submitBulkUpload()" class="btn" id="submitBulkUploadBtn" style="background: var(--accent);">
+                    <span id="submitBulkUploadText">Add Accounts</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -780,6 +851,155 @@
                 window.progressBar.cancel();
             }
         }
+
+        // Bulk Upload Modal Functions
+        const CSV_TEMPLATE = `Platform,Handle,Organization
+X,@hhsgov,Health and Human Services
+Instagram,hhsgov,Health and Human Services
+Facebook,HHS,Health and Human Services
+LinkedIn,company/hhs,Health and Human Services
+YouTube,@hhsgov,Health and Human Services`;
+
+        function showBulkUploadModal() {
+            const modal = document.getElementById('bulkUploadModal');
+            modal.style.display = 'flex';
+            // Animate in
+            requestAnimationFrame(() => {
+                modal.classList.add('modal-show');
+            });
+            document.getElementById('bulkUploadTextarea').focus();
+            // Reset form
+            document.getElementById('bulkUploadTextarea').value = '';
+            document.getElementById('bulkUploadMessages').style.display = 'none';
+            document.getElementById('submitBulkUploadBtn').disabled = false;
+            document.getElementById('submitBulkUploadText').textContent = 'Add Accounts';
+        }
+
+        function closeBulkUploadModal() {
+            const modal = document.getElementById('bulkUploadModal');
+            modal.classList.remove('modal-show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+                document.getElementById('bulkUploadTextarea').value = '';
+                document.getElementById('bulkUploadMessages').style.display = 'none';
+            }, 300); // Match CSS transition duration
+        }
+
+        function copyTemplate() {
+            navigator.clipboard.writeText(CSV_TEMPLATE).then(() => {
+                if (window.toast) {
+                    toast.success('Template copied to clipboard!');
+                }
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = CSV_TEMPLATE;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (window.toast) {
+                    toast.success('Template copied to clipboard!');
+                }
+            });
+        }
+
+        function clearBulkUpload() {
+            document.getElementById('bulkUploadTextarea').value = '';
+            document.getElementById('bulkUploadMessages').style.display = 'none';
+        }
+
+        async function submitBulkUpload() {
+            const textarea = document.getElementById('bulkUploadTextarea');
+            const csvData = textarea.value.trim();
+            const messagesDiv = document.getElementById('bulkUploadMessages');
+            const submitBtn = document.getElementById('submitBulkUploadBtn');
+            const submitText = document.getElementById('submitBulkUploadText');
+
+            if (!csvData) {
+                messagesDiv.innerHTML = '<div class="error-message" style="margin-top: 10px;">Please paste some CSV data first.</div>';
+                messagesDiv.style.display = 'block';
+                return;
+            }
+
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitText.textContent = 'Adding Accounts...';
+
+            try {
+                const token = localStorage.getItem('auth_token') || '';
+                const response = await fetch('/api/upload-bulk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': token ? `Bearer ${token}` : ''
+                    },
+                    body: JSON.stringify({ csv_data: csvData })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    messagesDiv.innerHTML = `<div style="background: #10b981; color: white; padding: 12px; border-radius: 6px; margin-top: 10px;">
+                        ✅ ${result.message || `Successfully added ${result.count || 0} accounts!`}
+                    </div>`;
+                    messagesDiv.style.display = 'block';
+                    
+                    if (window.toast) {
+                        toast.success(result.message || `Successfully added ${result.count || 0} accounts!`);
+                    }
+
+                    // Clear textarea and reload accounts after a short delay
+                    setTimeout(() => {
+                        textarea.value = '';
+                        if (window.dashboard) {
+                            window.dashboard.loadAccounts();
+                        }
+                        // Close modal after 2 seconds
+                        setTimeout(() => {
+                            closeBulkUploadModal();
+                        }, 2000);
+                    }, 1500);
+                } else {
+                    messagesDiv.innerHTML = `<div class="error-message" style="margin-top: 10px;">❌ ${result.error || 'Failed to add accounts'}</div>`;
+                    messagesDiv.style.display = 'block';
+                    
+                    if (window.toast) {
+                        toast.error(result.error || 'Failed to add accounts');
+                    }
+                    
+                    submitBtn.disabled = false;
+                    submitText.textContent = 'Add Accounts';
+                }
+            } catch (error) {
+                messagesDiv.innerHTML = `<div class="error-message" style="margin-top: 10px;">❌ Error: ${error.message}</div>`;
+                messagesDiv.style.display = 'block';
+                
+                if (window.toast) {
+                    toast.error('Error adding accounts: ' + error.message);
+                }
+                
+                submitBtn.disabled = false;
+                submitText.textContent = 'Add Accounts';
+            }
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('bulkUploadModal')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeBulkUploadModal();
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('bulkUploadModal');
+                if (modal && modal.style.display !== 'none') {
+                    closeBulkUploadModal();
+                }
+            }
+        });
     </script>
 </body>
 

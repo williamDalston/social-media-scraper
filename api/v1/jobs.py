@@ -14,7 +14,7 @@ from api.errors import BadRequestError, InternalServerError, NotFoundError
 from api.schemas import ScraperRunRequestSchema
 from api.validators import validate_request_body, serialize_response
 from auth.decorators import require_any_role
-from tasks.scraper_tasks import scrape_all_accounts, scrape_account, scrape_platform, backfill_account
+from tasks.scraper_tasks import scrape_all_accounts, scrape_account, scrape_platform, backfill_account, scrape_selected_accounts
 from tasks.utils import get_db_session
 from models.job import Job
 from scraper.schema import init_db
@@ -28,6 +28,21 @@ scraper_request_model = ns.model('ScraperRequest', {
         enum=['simulated', 'real'],
         default='simulated',
         example='simulated'
+    )
+})
+
+scraper_selected_request_model = ns.model('ScraperSelectedRequest', {
+    'mode': fields.String(
+        description='Scraper mode',
+        enum=['simulated', 'real'],
+        default='real',
+        example='real'
+    ),
+    'account_keys': fields.List(
+        fields.Integer(),
+        description='List of account keys to scrape',
+        required=True,
+        example=[1, 2, 3]
     )
 })
 
@@ -130,6 +145,69 @@ class RunScraper(Resource):
             
             return {
                 'message': 'Scraper job started',
+                'job_id': task.id,
+                'status': 'pending'
+            }
+        except Exception as e:
+            raise InternalServerError(f'Failed to start scraper job: {str(e)}')
+
+
+@ns.route('/run-scraper-selected')
+@ns.doc(security='Bearer Auth')
+class RunScraperSelected(Resource):
+    """Run the scraper for selected accounts."""
+    
+    @ns.doc('run_scraper_selected')
+    @ns.expect(scraper_selected_request_model)
+    @ns.marshal_with(scraper_response_model)
+    @ns.response(200, 'Success')
+    @ns.response(400, 'Bad Request', error_model)
+    @ns.response(401, 'Unauthorized', error_model)
+    @ns.response(403, 'Forbidden', error_model)
+    @ns.response(500, 'Internal Server Error', error_model)
+    @require_any_role(['Admin', 'Editor'])
+    def post(self):
+        """
+        Run the scraper to collect metrics for selected accounts.
+        
+        This endpoint triggers an asynchronous background job to scrape metrics
+        for specific accounts identified by their account keys.
+        
+        Returns immediately with a job_id that can be used to track progress.
+        
+        Only Admin and Editor roles can run the scraper.
+        """
+        if not request.is_json:
+            raise BadRequestError('Content-Type must be application/json')
+        
+        data = request.get_json() or {}
+        mode = data.get('mode', 'real')
+        account_keys = data.get('account_keys', [])
+        
+        # Only allow 'real' mode - simulations disabled
+        if mode != 'real':
+            raise BadRequestError('Only real mode is supported. Simulations are disabled.')
+        
+        if not account_keys or not isinstance(account_keys, list):
+            raise BadRequestError('account_keys must be a non-empty list of integers')
+        
+        if not all(isinstance(k, int) for k in account_keys):
+            raise BadRequestError('All account_keys must be integers')
+        
+        if len(account_keys) == 0:
+            raise BadRequestError('At least one account_key is required')
+        
+        try:
+            db_path = get_db_path()
+            # Trigger async task
+            task = scrape_selected_accounts.delay(account_keys=account_keys, mode=mode, db_path=db_path)
+            
+            # Create job record
+            from tasks.utils import create_job_record
+            create_job_record(task.id, 'scrape_selected', db_path=db_path)
+            
+            return {
+                'message': f'Scraper job started for {len(account_keys)} selected accounts',
                 'job_id': task.id,
                 'status': 'pending'
             }

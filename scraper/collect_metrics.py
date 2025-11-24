@@ -36,9 +36,9 @@ except:
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_workers=5, progress_callback=None):
+def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_workers=5, progress_callback=None, account_keys=None):
     """
-    Collect metrics for all accounts.
+    Collect metrics for all accounts or specific accounts.
     
     Args:
         db_path: Path to database file
@@ -46,6 +46,7 @@ def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_
         parallel: If True, use parallel scraping (default: True)
         max_workers: Number of parallel workers (default: 5)
         progress_callback: Optional callback function(processed, total, current_account, speed, elapsed)
+        account_keys: Optional list of account keys to scrape. If None, scrapes all active accounts.
     """
     import time
     start_time = time.time()
@@ -54,7 +55,16 @@ def simulate_metrics(db_path='social_media.db', mode='real', parallel=True, max_
     Session = sessionmaker(bind=engine)
     session = Session()
     
-    accounts = session.query(DimAccount).all()
+    # Query accounts based on account_keys parameter
+    if account_keys:
+        # Scrape specific accounts (regardless of is_active status)
+        accounts = session.query(DimAccount).filter(DimAccount.account_key.in_(account_keys)).all()
+    else:
+        # Scrape all active accounts
+        accounts = session.query(DimAccount).filter(
+            (DimAccount.is_active == True) | (DimAccount.is_active.is_(None))
+        ).all()
+    
     today = date.today()
     
     scraper = get_scraper(mode)

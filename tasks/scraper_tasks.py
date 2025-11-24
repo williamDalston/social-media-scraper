@@ -222,8 +222,10 @@ def scrape_all_accounts(self, mode='real', db_path=None):
             job.started_at = datetime.utcnow()
         session.commit()
         
-        # Get all accounts
-        accounts = session.query(DimAccount).all()
+        # Get all active accounts
+        accounts = session.query(DimAccount).filter(
+            (DimAccount.is_active == True) | (DimAccount.is_active.is_(None))
+        ).all()
         total_accounts = len(accounts)
         
         if total_accounts == 0:
@@ -343,8 +345,10 @@ def scrape_platform(self, platform, mode='real', db_path=None):
             job.started_at = datetime.utcnow()
         session.commit()
         
-        # Get accounts for platform
-        accounts = session.query(DimAccount).filter_by(platform=platform).all()
+        # Get active accounts for platform
+        accounts = session.query(DimAccount).filter_by(platform=platform).filter(
+            (DimAccount.is_active == True) | (DimAccount.is_active.is_(None))
+        ).all()
         total_accounts = len(accounts)
         
         if total_accounts == 0:
@@ -433,6 +437,137 @@ def scrape_platform(self, platform, mode='real', db_path=None):
             raise exc
     finally:
         session.close()
+
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
+def scrape_selected_accounts(self, account_keys, mode='real', db_path=None):
+    """
+    Scrape metrics for specific accounts.
+    
+    Args:
+        account_keys: List of account keys to scrape
+        mode: Scraper mode ('simulated' or 'real')
+        db_path: Path to database file
+    
+    Returns:
+        dict: Result with status and summary
+    """
+    if db_path is None:
+        db_path = os.getenv('DB_PATH', 'social_media.db')
+    
+    if not account_keys or not isinstance(account_keys, list):
+        raise ValueError("account_keys must be a non-empty list")
+    
+    job_id = self.request.id
+    session = get_db_session(db_path)
+    
+    try:
+        # Create or update job record
+        from models.job import Job
+        job = session.query(Job).filter_by(job_id=job_id).first()
+        if not job:
+            job = Job(
+                job_id=job_id,
+                job_type='scrape_selected',
+                status='running',
+                started_at=datetime.utcnow()
+            )
+            session.add(job)
+        else:
+            job.status = 'running'
+            job.started_at = datetime.utcnow()
+        session.commit()
+        
+        # Get accounts
+        accounts = session.query(DimAccount).filter(DimAccount.account_key.in_(account_keys)).all()
+        total_accounts = len(accounts)
+        
+        if total_accounts == 0:
+            raise ValueError(f"No accounts found for the provided account keys: {account_keys}")
+        
+        if total_accounts != len(account_keys):
+            found_keys = [a.account_key for a in accounts]
+            missing_keys = [k for k in account_keys if k not in found_keys]
+            logger.warning(f"Some account keys not found: {missing_keys}")
+        
+        logger.info(f"Starting scrape_selected_accounts job for {total_accounts} accounts")
+        
+        # Update progress
+        self.update_state(state='PROGRESS', meta={'progress': 10, 'message': f'Starting scrape for {total_accounts} selected accounts...'})
+        update_job_progress(job_id, 10, 'running', {'message': f'Starting scrape for {total_accounts} selected accounts...'})
+        
+        # Use the existing collect_metrics function with account_keys
+        session.close()  # Close before calling simulate_metrics which creates its own session
+        
+        # Update progress before starting
+        self.update_state(state='PROGRESS', meta={'progress': 20, 'message': 'Running scraper...'})
+        update_job_progress(job_id, 20, 'running', {'message': 'Running scraper...'})
+        
+        # Progress callback to update job progress
+        def progress_callback(processed, total, current_account, speed, elapsed):
+            progress = 20 + int((processed / total) * 70)  # 20-90% range
+            eta_seconds = (total - processed) / speed if speed > 0 else 0
+            eta_str = f"{int(eta_seconds // 60)}m {int(eta_seconds % 60)}s" if eta_seconds > 0 else "--"
+            
+            meta = {
+                'progress': progress,
+                'message': f'Scraping {current_account}... ({processed}/{total})',
+                'processed': processed,
+                'total': total,
+                'speed': round(speed, 2),
+                'elapsed': round(elapsed, 1),
+                'eta': eta_str
+            }
+            self.update_state(state='PROGRESS', meta=meta)
+            update_job_progress(job_id, progress, 'running', meta)
+        
+        # Optimize: Use more workers for better parallelization (up to 10)
+        import os
+        max_workers = min(10, int(os.getenv('SCRAPER_MAX_WORKERS', '8')))
+        from scraper.collect_metrics import simulate_metrics
+        simulate_metrics(db_path=db_path, mode=mode, parallel=True, max_workers=max_workers, 
+                         progress_callback=progress_callback, account_keys=account_keys)
+        
+        # Update progress after completion
+        self.update_state(state='PROGRESS', meta={'progress': 90, 'message': 'Finalizing...'})
+        update_job_progress(job_id, 90, 'running', {'message': 'Finalizing...'})
+        
+        # Reopen session for job update
+        session = get_db_session(db_path)
+        job = session.query(Job).filter_by(job_id=job_id).first()
+        
+        # Update job as completed
+        result_data = {
+            'status': 'completed',
+            'total_accounts': total_accounts,
+            'account_keys': account_keys,
+            'message': f'Successfully scraped {total_accounts} selected accounts'
+        }
+        
+        job.status = 'completed'
+        job.progress = 100.0
+        job.result = json.dumps(result_data)
+        job.completed_at = datetime.utcnow()
+        session.commit()
+        
+        return result_data
+        
+    except Exception as exc:
+        if 'session' in locals():
+            session.rollback()
+            from models.job import Job
+            job = session.query(Job).filter_by(job_id=job_id).first()
+            if job:
+                job.status = 'failed'
+                job.error_message = str(exc)
+                job.completed_at = datetime.utcnow()
+                session.commit()
+            session.close()
+        
+        # Retry if we haven't exceeded max retries
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc, countdown=120 * (self.request.retries + 1))
+        else:
+            raise exc
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=300)
 def backfill_account(self, account_key, days=365, db_path=None):

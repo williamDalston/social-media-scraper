@@ -17,6 +17,13 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Import logging configuration
+from config.logging_config import setup_logging, get_logger
+
+# Set up logging
+setup_logging()
+logger = get_logger(__name__)
+
 # Import auth modules
 from auth.routes import auth_bp
 from auth.decorators import require_auth, require_any_role
@@ -79,13 +86,6 @@ try:
     setup_security_middleware(app)
 except ImportError:
     pass  # Security middleware is optional
-
-# Security Middleware (bot detection, fraud detection)
-try:
-    from middleware.security_middleware import setup_security_middleware
-    setup_security_middleware(app)
-except ImportError:
-    pass
 
 # Production Security Hardening
 try:
@@ -443,34 +443,18 @@ def api_grid():
     finally:
         session.close()
 
-@app.route('/upload', methods=['POST'])
-@limiter.limit("10 per hour")
-@require_any_role(['Admin', 'Editor'])
-@csrf.exempt  # CSRF exempt for API endpoints, but still requires auth
-@track_performance('api_upload')
-def upload_csv():
-    """Upload CSV file to add accounts. Invalidates cache on success."""
-    user = getattr(request, 'current_user', None)
-    
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    
-    # Validate file extension
-    if not file.filename.lower().endswith('.csv'):
-        return jsonify({'error': 'Only CSV files are allowed'}), 400
-    
-    # Read file content
-    file_content = file.read()
-    
+def process_csv_data(csv_data, user=None):
+    """Process CSV data (from file or text) and add accounts."""
     # Validate CSV file (type, size, content)
-    is_valid, error_message, validated_rows = validate_csv_file(file_content, max_size_mb=10)
+    if isinstance(csv_data, bytes):
+        csv_bytes = csv_data
+    else:
+        csv_bytes = csv_data.encode('utf-8')
+    
+    is_valid, error_message, validated_rows = validate_csv_file(csv_bytes, max_size_mb=10)
     
     if not is_valid:
-        return jsonify({'error': error_message}), 400
+        return None, error_message, 0
     
     # Process validated rows
     session = get_db_session()
@@ -495,7 +479,8 @@ def upload_csv():
                     handle=handle,
                     org_name=org,
                     account_display_name=f"{org} on {platform}" if org else f"{handle} on {platform}",
-                    account_url=f"https://{platform.lower()}.com/{handle}"
+                    account_url=f"https://{platform.lower()}.com/{handle}",
+                    is_active=True
                 )
                 session.add(account)
                 count += 1
@@ -519,9 +504,69 @@ def upload_csv():
                 success=True
             )
         
-        return jsonify({'message': f'Successfully added {count} accounts'})
+        return True, None, count
+    except Exception as e:
+        session.rollback()
+        return None, str(e), 0
     finally:
         session.close()
+
+@app.route('/upload', methods=['POST'])
+@limiter.limit("10 per hour")
+@require_any_role(['Admin', 'Editor'])
+@csrf.exempt  # CSRF exempt for API endpoints, but still requires auth
+@track_performance('api_upload')
+def upload_csv():
+    """Upload CSV file to add accounts. Invalidates cache on success."""
+    user = getattr(request, 'current_user', None)
+    
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    
+    # Validate file extension
+    if not file.filename.lower().endswith('.csv'):
+        return jsonify({'error': 'Only CSV files are allowed'}), 400
+    
+    # Read file content
+    file_content = file.read()
+    
+    # Process CSV data
+    success, error_message, count = process_csv_data(file_content, user)
+    
+    if not success:
+        return jsonify({'error': error_message}), 400
+    
+    return jsonify({'message': f'Successfully added {count} accounts', 'count': count})
+
+@app.route('/api/upload-bulk', methods=['POST'])
+@limiter.limit("10 per hour")
+@require_any_role(['Admin', 'Editor'])
+@csrf.exempt  # CSRF exempt for API endpoints, but still requires auth
+@track_performance('api_upload_bulk')
+def upload_bulk():
+    """Upload accounts via pasted CSV text. Invalidates cache on success."""
+    user = getattr(request, 'current_user', None)
+    
+    if not request.is_json:
+        return jsonify({'error': 'Content-Type must be application/json'}), 400
+    
+    data = request.get_json()
+    csv_text = data.get('csv_data', '').strip()
+    
+    if not csv_text:
+        return jsonify({'error': 'No CSV data provided'}), 400
+    
+    # Process CSV data
+    success, error_message, count = process_csv_data(csv_text, user)
+    
+    if not success:
+        return jsonify({'error': error_message}), 400
+    
+    return jsonify({'message': f'Successfully added {count} accounts', 'count': count})
 
 @app.route('/api/run-scraper', methods=['POST'])
 @limiter.limit("5 per hour")

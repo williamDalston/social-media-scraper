@@ -18,6 +18,7 @@ class DimAccount(Base):
     owner_team = Column(String) # ASPA_DCD, DIG_ANALYT, etc.
     is_core_account = Column(Boolean, default=False)
     account_type = Column(String) # official dept, sub-brand, campaign, leader/personal
+    is_active = Column(Boolean, default=True)  # Whether account should be scraped
     
     # Risk/Governance
     is_leader_account = Column(Boolean, default=False)
