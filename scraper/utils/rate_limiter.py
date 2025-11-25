@@ -89,11 +89,13 @@ class RateLimiter:
                 if wait_time > 0:
                     # Check if wait time exceeds max_sleep_seconds
                     if self.max_sleep_seconds is not None and wait_time > self.max_sleep_seconds:
+                        wait_minutes = wait_time / 60
+                        cap_minutes = self.max_sleep_seconds / 60
                         logger.warning(
-                            f"Rate limit sleep {wait_time:.2f}s for {self.platform} exceeds cap {self.max_sleep_seconds}s; skipping."
+                            f"⏭️  SKIPPING: Rate limit wait {wait_minutes:.1f}min for {self.platform} exceeds cap {cap_minutes:.1f}min. Moving to next account."
                         )
                         raise RateLimitExceeded(
-                            f"Rate limit wait time {wait_time:.2f}s exceeds max {self.max_sleep_seconds}s for {self.platform}"
+                            f"Rate limit wait time {wait_time:.2f}s ({wait_minutes:.1f}min) exceeds max {self.max_sleep_seconds}s ({cap_minutes:.1f}min) for {self.platform}"
                         )
                     
                     logger.info(

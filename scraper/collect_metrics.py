@@ -7,6 +7,7 @@ from typing import Optional, List
 from sqlalchemy.orm import sessionmaker
 from scraper.schema import DimAccount, FactFollowersSnapshot, FactSocialPost, init_db
 from scraper.scrapers import get_scraper
+from scraper.utils.rate_limiter import RateLimitExceeded
 
 try:
     from utils.parallel import scrape_accounts_parallel, ScrapingMetrics
@@ -144,6 +145,19 @@ def simulate_metrics(
     today = date.today()
 
     scraper = get_scraper(mode, max_sleep_seconds=max_sleep_seconds)
+    
+    # Log configuration for visibility
+    config_msg = f"Mode: {mode}"
+    if max_sleep_seconds:
+        config_msg += f" | Max wait: {max_sleep_seconds}s ({max_sleep_seconds/60:.1f}min)"
+    else:
+        config_msg += " | Max wait: unlimited"
+    if limit_platforms:
+        config_msg += f" | Platforms: {', '.join(limit_platforms)}"
+    if max_accounts:
+        config_msg += f" | Max accounts: {max_accounts}"
+    logger.info(config_msg)
+    
     logger.info(
         "Starting metrics collection",
         extra={
@@ -152,6 +166,9 @@ def simulate_metrics(
             "db_path": db_path,
             "parallel": parallel,
             "max_workers": max_workers if parallel else 1,
+            "max_sleep_seconds": max_sleep_seconds,
+            "limit_platforms": limit_platforms,
+            "max_accounts": max_accounts,
         },
     )
 
@@ -199,6 +216,19 @@ def simulate_metrics(
                         platform=platform, status="success"
                     ).inc(count)
 
+        # Build summary message
+        summary_msg = (
+            f"✅ Metrics collection complete (parallel): "
+            f"{summary['success_count']} succeeded, "
+            f"{summary['error_count']} errors, "
+            f"{summary['skipped_count']} skipped"
+        )
+        if max_sleep_seconds:
+            summary_msg += f" | Max wait cap: {max_sleep_seconds}s ({max_sleep_seconds/60:.1f}min)"
+        summary_msg += f" | Time: {elapsed_time:.1f}s"
+        
+        logger.info(summary_msg)
+        
         logger.info(
             "Metrics collection complete (parallel)",
             extra={
@@ -212,6 +242,7 @@ def simulate_metrics(
                 "accounts_per_second": summary["accounts_per_second"],
                 "platform_counts": summary["platform_counts"],
                 "max_workers": max_workers,
+                "max_sleep_seconds": max_sleep_seconds,
             },
         )
 
@@ -350,6 +381,8 @@ def simulate_metrics(
         session.commit()
         elapsed_time = time.time() - start_time
 
+        skipped_count = len(accounts) - success_count - error_count
+
         # Record Prometheus metrics
         if METRICS_AVAILABLE and record_scraper_run:
             # Count accounts by platform for metrics
@@ -374,14 +407,28 @@ def simulate_metrics(
                         platform=platform, status="success"
                     ).inc(count)
 
+        # Build summary message
+        summary_msg = (
+            f"✅ Metrics collection complete (sequential): "
+            f"{success_count} succeeded, "
+            f"{error_count} errors, "
+            f"{skipped_count} skipped"
+        )
+        if max_sleep_seconds:
+            summary_msg += f" | Max wait cap: {max_sleep_seconds}s ({max_sleep_seconds/60:.1f}min)"
+        summary_msg += f" | Time: {elapsed_time:.1f}s"
+        
+        logger.info(summary_msg)
+        
         logger.info(
             "Metrics collection complete (sequential)",
             extra={
                 "total_accounts": len(accounts),
                 "success_count": success_count,
                 "error_count": error_count,
-                "skipped_count": len(accounts) - success_count - error_count,
+                "skipped_count": skipped_count,
                 "elapsed_time": elapsed_time,
+                "max_sleep_seconds": max_sleep_seconds,
             },
         )
 

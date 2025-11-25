@@ -151,7 +151,15 @@ class BasePlatformScraper(ABC):
             logger.error(f"Rate limit exceeded for {self.platform}: {e}")
             return None
         except RateLimitExceeded as e:
-            logger.warning(f"Rate limit wait time too long for {self.platform}, skipping: {e}")
+            logger.warning(
+                f"⏭️  SKIPPED {self.platform} account due to long wait time. Continuing to next account.",
+                extra={
+                    "platform": self.platform,
+                    "account_url": account.account_url if hasattr(account, 'account_url') else None,
+                    "handle": account.handle if hasattr(account, 'handle') else None,
+                    "reason": "rate_limit_wait_too_long",
+                }
+            )
             return None
         except ScraperError as e:
             logger.error(f"Scraper error for {self.platform}: {e}")
